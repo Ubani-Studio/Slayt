@@ -26,7 +26,10 @@ const youtubeVideoSchema = new mongoose.Schema({
     trim: true
   },
   thumbnail: {
-    type: String // base64 or URL
+    type: String // base64 or URL (1920x1080 compressed)
+  },
+  thumbnailOriginalUrl: {
+    type: String // Cloudinary URL of uncompressed original
   },
   videoFileName: {
     type: String

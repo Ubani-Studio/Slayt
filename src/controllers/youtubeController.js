@@ -9,34 +9,35 @@ const cloudinaryService = require('../services/cloudinaryService');
  * @param {string} userId - User ID for folder organization
  * @returns {Promise<string>} Cloudinary URL
  */
+/**
+ * Upload base64 thumbnail to Cloudinary.
+ * Returns { url, originalUrl } — url is the CDN link, originalUrl is the
+ * permanent uncompressed reference (same upload, but stored for re-export).
+ */
 const uploadThumbnailToCloudinary = async (base64Data, userId) => {
   if (!base64Data || !base64Data.startsWith('data:')) {
-    return base64Data; // Return as-is if not base64 (might already be a URL)
+    return { url: base64Data, originalUrl: null };
   }
 
   if (!cloudinaryService.isConfigured()) {
     console.warn('Cloudinary not configured, storing thumbnail as base64');
-    return base64Data;
+    return { url: base64Data, originalUrl: null };
   }
 
   try {
-    // Convert base64 to buffer
     const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Content, 'base64');
 
-    // Upload to Cloudinary
-    // Use 'limit' crop to resize only if larger, maintaining aspect ratio
-    // YouTube recommends 1280x720 but we'll accept up to 1920x1080
+    // Upload to Cloudinary (no transformation — stores the full 1920x1080 source)
     const result = await cloudinaryService.uploadBuffer(buffer, {
       folder: `slayt/youtube/${userId}`,
       resource_type: 'image',
     });
 
-    return result.secure_url;
+    return { url: result.secure_url, originalUrl: result.secure_url };
   } catch (error) {
     console.error('Failed to upload thumbnail to Cloudinary:', error);
-    // Fall back to base64 if upload fails
-    return base64Data;
+    return { url: base64Data, originalUrl: null };
   }
 };
 
@@ -256,8 +257,11 @@ exports.createVideo = async (req, res) => {
 
     // Upload thumbnail to Cloudinary if it's base64
     let thumbnailUrl = thumbnail || '';
+    let thumbnailOriginalUrl = null;
     if (thumbnail && thumbnail.startsWith('data:')) {
-      thumbnailUrl = await uploadThumbnailToCloudinary(thumbnail, req.user._id.toString());
+      const result = await uploadThumbnailToCloudinary(thumbnail, req.user._id.toString());
+      thumbnailUrl = result.url;
+      thumbnailOriginalUrl = result.originalUrl;
     }
 
     const video = new YoutubeVideo({
@@ -265,6 +269,7 @@ exports.createVideo = async (req, res) => {
       title: title.trim(),
       description: description || '',
       thumbnail: thumbnailUrl,
+      thumbnailOriginalUrl,
       collectionId: collectionId || null,
       status: status || 'draft',
       scheduledDate: scheduledDate || null,
@@ -389,13 +394,13 @@ exports.updateVideo = async (req, res) => {
       // User sees thumbnail instantly; Cloudinary URL replaces it async
       setImmediate(() => {
         uploadThumbnailToCloudinary(base64Data, userId)
-          .then(url => {
+          .then(({ url, originalUrl }) => {
             if (url !== base64Data) {
-              // Only replace if thumbnail is still OUR base64 — prevents race
-              // condition where a newer upload overwrites a more recent thumbnail
+              const $set = { thumbnail: url };
+              if (originalUrl) $set.thumbnailOriginalUrl = originalUrl;
               YoutubeVideo.updateOne(
                 { _id: videoId, thumbnail: base64Data },
-                { $set: { thumbnail: url } }
+                { $set }
               ).catch(err => console.error('Failed to persist Cloudinary URL:', err));
             }
           })
@@ -410,7 +415,7 @@ exports.updateVideo = async (req, res) => {
     }
 
     // Update allowed fields
-    const allowedUpdates = ['title', 'description', 'thumbnail', 'collectionId', 'status', 'scheduledDate', 'position', 'tags', 'videoFileName', 'videoFileSize', 'artistName', 'originalFilename'];
+    const allowedUpdates = ['title', 'description', 'thumbnail', 'thumbnailOriginalUrl', 'collectionId', 'status', 'scheduledDate', 'position', 'tags', 'videoFileName', 'videoFileSize', 'artistName', 'originalFilename'];
 
     allowedUpdates.forEach(field => {
       if (updates[field] !== undefined) {

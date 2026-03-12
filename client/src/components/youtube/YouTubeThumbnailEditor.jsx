@@ -49,9 +49,9 @@ function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
-    // YouTube thumbnail dimensions
-    canvas.width = 1280;
-    canvas.height = 720;
+    // YouTube thumbnail dimensions (full HD for best quality)
+    canvas.width = 1920;
+    canvas.height = 1080;
 
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
@@ -87,7 +87,7 @@ function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
 
     ctx.restore();
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
     onSave(dataUrl);
   };
 

@@ -1,15 +1,15 @@
 /**
  * Compress an image File into a 16:9 JPEG data URL for YouTube thumbnails.
- * Always outputs a 1280x720 canvas. Vertical/non-16:9 images are centered
+ * Always outputs a 1920x1080 canvas. Vertical/non-16:9 images are centered
  * with black bars (pillarboxing/letterboxing) — never cropped.
  *
  * @param {File} file - Image file to compress
- * @param {number} canvasWidth - Output width (default 1280)
- * @param {number} canvasHeight - Output height (default 720)
- * @param {number} quality - JPEG quality 0-1 (default 0.92)
+ * @param {number} canvasWidth - Output width (default 1920)
+ * @param {number} canvasHeight - Output height (default 1080)
+ * @param {number} quality - JPEG quality 0-1 (default 0.95)
  * @returns {Promise<string>} Compressed base64 data URL
  */
-export async function compressImageFile(file, canvasWidth = 1280, canvasHeight = 720, quality = 0.92) {
+export async function compressImageFile(file, canvasWidth = 1920, canvasHeight = 1080, quality = 0.95) {
   const bitmap = await createImageBitmap(file);
 
   const canvas = document.createElement('canvas');
@@ -37,16 +37,16 @@ export async function compressImageFile(file, canvasWidth = 1280, canvasHeight =
 
 /**
  * Compress an image from a data URL into a 16:9 JPEG.
- * Same 1280x720 canvas with black bars for non-16:9 sources.
+ * Same 1920x1080 canvas with black bars for non-16:9 sources.
  * Kept for backward compatibility (single-file thumbnail editor, etc.)
  *
  * @param {string} dataUrl - Base64 data URL of the image
- * @param {number} canvasWidth - Output width (default 1280)
- * @param {number} canvasHeight - Output height (default 720)
- * @param {number} quality - JPEG quality 0-1 (default 0.92)
+ * @param {number} canvasWidth - Output width (default 1920)
+ * @param {number} canvasHeight - Output height (default 1080)
+ * @param {number} quality - JPEG quality 0-1 (default 0.95)
  * @returns {Promise<string>} Compressed base64 data URL
  */
-export function compressImage(dataUrl, canvasWidth = 1280, canvasHeight = 720, quality = 0.92) {
+export function compressImage(dataUrl, canvasWidth = 1920, canvasHeight = 1080, quality = 0.95) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const timeout = setTimeout(() => {
