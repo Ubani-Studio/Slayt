@@ -7,6 +7,9 @@ import {
   Calendar,
   Trash2,
   Upload,
+  Copy,
+  Scissors,
+  ClipboardPaste,
   Eye,
   EyeOff,
   Youtube,
@@ -34,7 +37,14 @@ const STATUS_OPTIONS = [
 const TITLE_MAX = 100;
 const TITLE_VISIBLE = 60; // Characters visible in search results
 
-function YouTubeVideoDetails({ video, onThumbnailUpload }) {
+function YouTubeVideoDetails({
+  video,
+  onThumbnailUpload,
+  thumbnailClipboard,
+  onCopyThumbnail,
+  onCutThumbnail,
+  onPasteThumbnail,
+}) {
   const updateYoutubeVideo = useAppStore((state) => state.updateYoutubeVideo);
   const deleteYoutubeVideo = useAppStore((state) => state.deleteYoutubeVideo);
   const currentProfileId = useAppStore((state) => state.currentProfileId);
@@ -434,6 +444,48 @@ function YouTubeVideoDetails({ video, onThumbnailUpload }) {
             </label>
           </div>
         </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onCopyThumbnail?.(video)}
+            disabled={!video.thumbnail}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-200 rounded-lg text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            <span>Copy</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onCutThumbnail?.(video)}
+            disabled={!video.thumbnail}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-200 rounded-lg text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Scissors className="w-3.5 h-3.5" />
+            <span>Cut</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onPasteThumbnail?.(video)}
+            disabled={!thumbnailClipboard?.thumbnail}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-100 hover:bg-white text-dark-900 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ClipboardPaste className="w-3.5 h-3.5" />
+            <span>Paste</span>
+          </button>
+        </div>
+
+        {thumbnailClipboard?.thumbnail && (
+          <div className="rounded-lg border border-dark-600 bg-dark-700/60 px-3 py-2">
+            <p className="text-xs text-dark-300">
+              {thumbnailClipboard.mode === 'cut' ? 'Cut' : 'Copied'} thumbnail ready
+              {thumbnailClipboard.sourceCollectionName ? ` from ${thumbnailClipboard.sourceCollectionName}` : ''}.
+            </p>
+            <p className="text-xs text-dark-500 truncate">
+              {thumbnailClipboard.sourceVideoTitle || 'Untitled video'}
+            </p>
+          </div>
+        )}
 
         {/* Video File Upload */}
         <div className="bg-dark-700 rounded-lg border border-dark-600">

@@ -1,57 +1,182 @@
-import { useState, useRef, useCallback } from 'react';
-import { X, Check, ZoomIn, ZoomOut, RotateCw, Upload, Image } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { X, Check, ZoomIn, ZoomOut, RotateCw, Image } from 'lucide-react';
 
-// YouTube thumbnail is 16:9 (1280x720 recommended)
-const ASPECT_RATIO = 16 / 9;
+const OUTPUT_WIDTH = 1920;
+const OUTPUT_HEIGHT = 1080;
+const MAX_ZOOM = 3;
+const MIN_ZOOM = 1;
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getRotatedSize(imageSize, rotation) {
+  if (!imageSize.width || !imageSize.height) {
+    return { width: 0, height: 0 };
+  }
+
+  const normalized = ((rotation % 360) + 360) % 360;
+  const isQuarterTurn = normalized === 90 || normalized === 270;
+
+  return isQuarterTurn
+    ? { width: imageSize.height, height: imageSize.width }
+    : imageSize;
+}
+
+function getFrameMetrics(imageSize, frameSize, rotation, zoom) {
+  if (!imageSize.width || !imageSize.height || !frameSize.width || !frameSize.height) {
+    return {
+      coverScale: 1,
+      scaledWidth: 0,
+      scaledHeight: 0,
+      maxOffsetX: 0,
+      maxOffsetY: 0,
+    };
+  }
+
+  const rotated = getRotatedSize(imageSize, rotation);
+  const coverScale = Math.max(
+    frameSize.width / rotated.width,
+    frameSize.height / rotated.height
+  );
+  const scaledWidth = rotated.width * coverScale * zoom;
+  const scaledHeight = rotated.height * coverScale * zoom;
+
+  return {
+    coverScale,
+    scaledWidth,
+    scaledHeight,
+    maxOffsetX: Math.max(0, (scaledWidth - frameSize.width) / 2),
+    maxOffsetY: Math.max(0, (scaledHeight - frameSize.height) / 2),
+  };
+}
 
 function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(MIN_ZOOM);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   const containerRef = useRef(null);
-  const imageRef = useRef(null);
+  const dragStateRef = useRef({ pointerId: null, startX: 0, startY: 0 });
 
-  const handleMouseDown = useCallback((e) => {
+  const clampPosition = useCallback((nextPosition, nextZoom = zoom, nextRotation = rotation) => {
+    const metrics = getFrameMetrics(imageSize, containerSize, nextRotation, nextZoom);
+
+    return {
+      x: clamp(nextPosition.x, -metrics.maxOffsetX, metrics.maxOffsetX),
+      y: clamp(nextPosition.y, -metrics.maxOffsetY, metrics.maxOffsetY),
+    };
+  }, [containerSize, imageSize, rotation, zoom]);
+
+  useEffect(() => {
+    if (!image) {
+      setImageSize({ width: 0, height: 0 });
+      return;
+    }
+
+    let cancelled = false;
+    const img = new window.Image();
+    img.onload = () => {
+      if (cancelled) return;
+      setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+      setZoom(MIN_ZOOM);
+      setPosition({ x: 0, y: 0 });
+      setRotation(0);
+      setIsDragging(false);
+    };
+    img.src = image;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [image]);
+
+  useEffect(() => {
+    if (!containerRef.current) return undefined;
+
+    const updateContainerSize = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      setContainerSize({ width: rect.width, height: rect.height });
+    };
+
+    updateContainerSize();
+
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updateContainerSize)
+      : null;
+
+    observer?.observe(containerRef.current);
+    window.addEventListener('resize', updateContainerSize);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateContainerSize);
+    };
+  }, []);
+
+  useEffect(() => {
+    setPosition((current) => clampPosition(current));
+  }, [clampPosition]);
+
+  const handlePointerDown = useCallback((e) => {
+    if (!imageSize.width || !imageSize.height) return;
+
     e.preventDefault();
+    dragStateRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX - position.x,
+      startY: e.clientY - position.y,
+    };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     setIsDragging(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    });
-  }, [position]);
+  }, [imageSize, position]);
 
-  const handleMouseMove = useCallback((e) => {
-    if (!isDragging) return;
-    setPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    });
-  }, [isDragging, dragStart]);
+  const handlePointerMove = useCallback((e) => {
+    if (!isDragging || dragStateRef.current.pointerId !== e.pointerId) return;
 
-  const handleMouseUp = useCallback(() => {
+    setPosition(clampPosition({
+      x: e.clientX - dragStateRef.current.startX,
+      y: e.clientY - dragStateRef.current.startY,
+    }));
+  }, [clampPosition, isDragging]);
+
+  const handlePointerUp = useCallback((e) => {
+    if (dragStateRef.current.pointerId !== e.pointerId) return;
+
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    dragStateRef.current = { pointerId: null, startX: 0, startY: 0 };
     setIsDragging(false);
   }, []);
 
-  const handleZoomChange = (newZoom) => {
-    setZoom(Math.max(0.5, Math.min(3, newZoom)));
-  };
+  const handleZoomChange = useCallback((nextZoom) => {
+    const clampedZoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+    setZoom(clampedZoom);
+    setPosition((current) => clampPosition(current, clampedZoom, rotation));
+  }, [clampPosition, rotation]);
 
-  const handleRotate = () => {
-    setRotation((prev) => (prev + 90) % 360);
-  };
+  const handleRotate = useCallback(() => {
+    const nextRotation = (rotation + 90) % 360;
+    setRotation(nextRotation);
+    setPosition((current) => clampPosition(current, zoom, nextRotation));
+  }, [clampPosition, rotation, zoom]);
 
-  const handleSave = async () => {
-    if (!imageRef.current || !containerRef.current) return;
+  const handleSave = useCallback(async () => {
+    if (!image || !containerSize.width || !containerSize.height || !imageSize.width || !imageSize.height) {
+      return;
+    }
 
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    canvas.width = OUTPUT_WIDTH;
+    canvas.height = OUTPUT_HEIGHT;
 
-    // YouTube thumbnail dimensions (full HD for best quality)
-    canvas.width = 1920;
-    canvas.height = 1080;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
 
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
@@ -62,39 +187,33 @@ function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
       img.src = image;
     });
 
-    // Calculate crop area based on zoom and position
-    const container = containerRef.current.getBoundingClientRect();
-    const scaleX = img.naturalWidth / (container.width * zoom);
-    const scaleY = img.naturalHeight / (container.height * zoom);
-
-    // Draw with transformations
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.translate(-canvas.width / 2, -canvas.height / 2);
-
-    ctx.drawImage(
-      img,
-      -position.x * scaleX,
-      -position.y * scaleY,
-      container.width * scaleX,
-      container.height * scaleY,
-      0,
-      0,
-      canvas.width,
-      canvas.height
+    const canvasMetrics = getFrameMetrics(
+      imageSize,
+      { width: OUTPUT_WIDTH, height: OUTPUT_HEIGHT },
+      rotation,
+      zoom
     );
+    const scaledPosition = {
+      x: position.x * (OUTPUT_WIDTH / containerSize.width),
+      y: position.y * (OUTPUT_HEIGHT / containerSize.height),
+    };
 
+    ctx.save();
+    ctx.translate((OUTPUT_WIDTH / 2) + scaledPosition.x, (OUTPUT_HEIGHT / 2) + scaledPosition.y);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.scale(canvasMetrics.coverScale * zoom, canvasMetrics.coverScale * zoom);
+    ctx.drawImage(img, -imageSize.width / 2, -imageSize.height / 2, imageSize.width, imageSize.height);
     ctx.restore();
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    onSave(dataUrl);
-  };
+    onSave(canvas.toDataURL('image/jpeg', 0.95));
+  }, [containerSize, image, imageSize, onSave, position, rotation, zoom]);
+
+  const previewMetrics = getFrameMetrics(imageSize, containerSize, rotation, zoom);
+  const previewScale = previewMetrics.coverScale * zoom;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-dark-800 rounded-2xl border border-dark-700 w-full max-w-2xl overflow-hidden">
-        {/* Header */}
         <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-dark-100">Edit Thumbnail</h2>
           <button
@@ -105,42 +224,44 @@ function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
           </button>
         </div>
 
-        {/* Preview Area */}
         <div className="p-4">
           <div
             ref={containerRef}
-            className="relative aspect-video bg-dark-900 rounded-lg overflow-hidden cursor-move"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+            className={`relative aspect-video bg-dark-900 rounded-lg overflow-hidden ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            style={{ touchAction: 'none' }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onPointerLeave={handlePointerUp}
           >
             {image ? (
-              <img
-                ref={imageRef}
-                src={image}
-                alt="Thumbnail preview"
-                className="absolute select-none"
+              <div
+                className="absolute left-1/2 top-1/2 pointer-events-none"
                 style={{
-                  transform: `translate(${position.x}px, ${position.y}px) scale(${zoom}) rotate(${rotation}deg)`,
-                  transformOrigin: 'center center',
-                  maxWidth: 'none',
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
+                  transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
                 }}
-                draggable={false}
-              />
+              >
+                <img
+                  src={image}
+                  alt="Thumbnail preview"
+                  className="block select-none max-w-none"
+                  style={{
+                    width: imageSize.width || undefined,
+                    height: imageSize.height || undefined,
+                    transform: `rotate(${rotation}deg) scale(${previewScale})`,
+                    transformOrigin: 'center center',
+                  }}
+                  draggable={false}
+                />
+              </div>
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Image className="w-16 h-16 text-dark-500" />
               </div>
             )}
 
-            {/* 16:9 Frame Indicator */}
             <div className="absolute inset-0 border-2 border-white/30 pointer-events-none" />
-
-            {/* Rule of thirds */}
             <div className="absolute inset-0 pointer-events-none opacity-50">
               <div className="absolute left-1/3 top-0 bottom-0 border-l border-white/20" />
               <div className="absolute left-2/3 top-0 bottom-0 border-l border-white/20" />
@@ -149,9 +270,7 @@ function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
             </div>
           </div>
 
-          {/* Controls */}
           <div className="mt-4 flex items-center justify-center gap-4">
-            {/* Zoom */}
             <div className="flex items-center gap-2 bg-dark-700 rounded-lg p-2">
               <button
                 onClick={() => handleZoomChange(zoom - 0.1)}
@@ -161,8 +280,8 @@ function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
               </button>
               <input
                 type="range"
-                min="0.5"
-                max="3"
+                min={MIN_ZOOM}
+                max={MAX_ZOOM}
                 step="0.1"
                 value={zoom}
                 onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
@@ -179,7 +298,6 @@ function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
               </span>
             </div>
 
-            {/* Rotate */}
             <button
               onClick={handleRotate}
               className="flex items-center gap-2 px-3 py-2 bg-dark-700 text-dark-300 hover:text-white rounded-lg transition-colors"
@@ -189,16 +307,15 @@ function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
             </button>
           </div>
 
-          {/* Tips */}
           <div className="mt-4 p-3 bg-dark-700 rounded-lg">
             <p className="text-xs text-dark-400">
-              <strong className="text-dark-300">Tip:</strong> YouTube thumbnails are 1280x720 (16:9).
-              Drag to position, zoom to crop. Text and faces should be in the center for best visibility.
+              <strong className="text-dark-300">Tip:</strong> Keep thumbnails at 16:9.
+              YouTube recommends at least 1280x720; this editor exports a sharper 1920x1080 JPEG
+              and locks the crop so black edges never show.
             </p>
           </div>
         </div>
 
-        {/* Footer */}
         <div className="px-4 py-3 border-t border-dark-700 flex justify-end gap-2">
           <button onClick={onCancel} className="btn-secondary">
             Cancel
@@ -214,3 +331,9 @@ function YouTubeThumbnailEditor({ image, onSave, onCancel }) {
 }
 
 export default YouTubeThumbnailEditor;
+
+YouTubeThumbnailEditor.propTypes = {
+  image: PropTypes.string,
+  onSave: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+};

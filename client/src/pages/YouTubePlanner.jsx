@@ -85,10 +85,12 @@ function YouTubePlanner() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [editingThumbnail, setEditingThumbnail] = useState(null);
+  const [editingThumbnailSourceFilename, setEditingThumbnailSourceFilename] = useState('');
   const [editingVideoId, setEditingVideoId] = useState(null);
   const [showBulkReplace, setShowBulkReplace] = useState(false);
   const [bulkReplaceScope, setBulkReplaceScope] = useState('collection');
   const [collectionsCollapsed, setCollectionsCollapsed] = useState(false);
+  const [thumbnailClipboard, setThumbnailClipboard] = useState(null);
 
   // Loading and error states for cloud sync
   const [loading, setLoading] = useState(true);
@@ -531,6 +533,15 @@ function YouTubePlanner() {
     });
   }, []);
 
+  const readImageFile = useCallback(async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
   // Handle file upload from input or drop - saves to cloud
   const handleFileUpload = useCallback(async (e) => {
     const files = e.target?.files || e.dataTransfer?.files;
@@ -596,20 +607,25 @@ function YouTubePlanner() {
 
   // Handle thumbnail replacement for existing video
   const handleThumbnailUpload = useCallback(async (file, videoId) => {
-    const thumbnail = await processImageFile(file);
-    // Open editor for cropping
-    setEditingThumbnail(thumbnail);
+    const rawImage = await readImageFile(file);
+    // Open editor with the original upload so preview matches the saved crop
+    setEditingThumbnail(rawImage);
+    setEditingThumbnailSourceFilename(file.name || '');
     setEditingVideoId(videoId);
-  }, [processImageFile]);
+  }, [readImageFile]);
 
   // Save edited thumbnail - saves to cloud
   const handleSaveThumbnail = useCallback(async (croppedThumbnail) => {
     if (editingVideoId) {
       try {
-        await youtubeApi.updateVideo(editingVideoId, { thumbnail: croppedThumbnail });
+        const updates = {
+          thumbnail: croppedThumbnail,
+          ...(editingThumbnailSourceFilename ? { thumbnailSourceFilename: editingThumbnailSourceFilename } : {}),
+        };
+        await youtubeApi.updateVideo(editingVideoId, updates);
         // Update local state
         setYoutubeVideos(youtubeVideos.map(v =>
-          (v._id || v.id) === editingVideoId ? { ...v, thumbnail: croppedThumbnail } : v
+          (v._id || v.id) === editingVideoId ? { ...v, ...updates } : v
         ));
       } catch (err) {
         console.error('Failed to save thumbnail:', err);
@@ -617,8 +633,73 @@ function YouTubePlanner() {
       }
     }
     setEditingThumbnail(null);
+    setEditingThumbnailSourceFilename('');
     setEditingVideoId(null);
-  }, [editingVideoId, youtubeVideos, setYoutubeVideos]);
+  }, [editingThumbnailSourceFilename, editingVideoId, youtubeVideos, setYoutubeVideos]);
+
+  const handleCopyThumbnail = useCallback((video) => {
+    if (!video?.thumbnail) return;
+
+    setThumbnailClipboard({
+      mode: 'copy',
+      thumbnail: video.thumbnail,
+      thumbnailOriginalUrl: video.thumbnailOriginalUrl || null,
+      thumbnailSourceFilename: video.thumbnailSourceFilename || video.originalFilename || '',
+      sourceVideoId: video._id || video.id,
+      sourceCollectionId: currentYoutubeCollectionId,
+      sourceCollectionName: currentCollection.name,
+      sourceVideoTitle: video.title || 'Untitled video',
+    });
+  }, [currentCollection.name, currentYoutubeCollectionId]);
+
+  const handleCutThumbnail = useCallback((video) => {
+    if (!video?.thumbnail) return;
+
+    setThumbnailClipboard({
+      mode: 'cut',
+      thumbnail: video.thumbnail,
+      thumbnailOriginalUrl: video.thumbnailOriginalUrl || null,
+      thumbnailSourceFilename: video.thumbnailSourceFilename || video.originalFilename || '',
+      sourceVideoId: video._id || video.id,
+      sourceCollectionId: currentYoutubeCollectionId,
+      sourceCollectionName: currentCollection.name,
+      sourceVideoTitle: video.title || 'Untitled video',
+    });
+  }, [currentCollection.name, currentYoutubeCollectionId]);
+
+  const handlePasteThumbnail = useCallback(async (video) => {
+    if (!thumbnailClipboard?.thumbnail || !video) return;
+
+    const targetVideoId = video._id || video.id;
+    const sourceVideoId = thumbnailClipboard.sourceVideoId;
+    const targetUpdates = {
+      thumbnail: thumbnailClipboard.thumbnail,
+      thumbnailOriginalUrl: thumbnailClipboard.thumbnailOriginalUrl,
+      thumbnailSourceFilename: thumbnailClipboard.thumbnailSourceFilename || undefined,
+    };
+
+    try {
+      await youtubeApi.updateVideo(targetVideoId, targetUpdates);
+      updateYoutubeVideo(targetVideoId, targetUpdates);
+
+      if (thumbnailClipboard.mode === 'cut' && sourceVideoId && sourceVideoId !== targetVideoId) {
+        const clearSourceUpdates = {
+          thumbnail: '',
+          thumbnailOriginalUrl: null,
+          thumbnailSourceFilename: '',
+        };
+        await youtubeApi.updateVideo(sourceVideoId, clearSourceUpdates);
+        updateYoutubeVideo(sourceVideoId, clearSourceUpdates);
+      }
+
+      if (thumbnailClipboard.mode === 'cut') {
+        setThumbnailClipboard(null);
+      }
+    } catch (err) {
+      console.error('Failed to paste thumbnail:', err);
+      setError('Failed to paste thumbnail.');
+    }
+  }, [thumbnailClipboard, updateYoutubeVideo]);
 
   // Bulk replace: update a single video's thumbnail
   const handleBulkReplaceSingle = useCallback(async (videoId, base64, extraUpdates = {}) => {
@@ -1240,6 +1321,10 @@ function YouTubePlanner() {
         <YouTubeVideoDetails
           video={selectedVideo}
           onThumbnailUpload={handleThumbnailUpload}
+          thumbnailClipboard={thumbnailClipboard}
+          onCopyThumbnail={handleCopyThumbnail}
+          onCutThumbnail={handleCutThumbnail}
+          onPasteThumbnail={handlePasteThumbnail}
         />
       </div>
 
@@ -1250,6 +1335,7 @@ function YouTubePlanner() {
           onSave={handleSaveThumbnail}
           onCancel={() => {
             setEditingThumbnail(null);
+            setEditingThumbnailSourceFilename('');
             setEditingVideoId(null);
           }}
         />
