@@ -489,10 +489,11 @@ function YouTubeGridView({ isLocked, onUpload }) {
 
             {/* Video Grid — same responsive layout always */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 flex-1">
-              {youtubeVideos.map((video) => (
+              {youtubeVideos.map((video, index) => (
                 <YouTubeVideoCard
                   key={video.id}
                   video={video}
+                  displayIndex={index}
                   isSelected={video.id === selectedYoutubeVideoId}
                   isLocked={isLocked}
                   isDropTarget={video.id === overItemId}

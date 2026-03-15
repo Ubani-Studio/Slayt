@@ -223,6 +223,10 @@ export const youtubeApi = {
     const { data } = await api.put(`/api/youtube/collections/${id}`, updates);
     return data;
   },
+  async scheduleCollection(id, entries) {
+    const { data } = await api.post(`/api/youtube/collections/${id}/schedule`, { entries });
+    return data;
+  },
   async deleteCollection(id) {
     const { data } = await api.delete(`/api/youtube/collections/${id}`);
     return data;

@@ -23,6 +23,9 @@ router.get('/collections/:id', youtubeController.getCollection);
 // Update collection
 router.put('/collections/:id', youtubeController.updateCollection);
 
+// Bulk schedule videos in a collection
+router.post('/collections/:id/schedule', youtubeController.scheduleCollection);
+
 // Delete collection
 router.delete('/collections/:id', youtubeController.deleteCollection);
 

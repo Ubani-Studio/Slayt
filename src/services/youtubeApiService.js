@@ -17,9 +17,11 @@ const path = require('path');
 const crypto = require('crypto');
 const { pipeline } = require('stream/promises');
 const { google } = require('googleapis');
+const sharp = require('sharp');
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const YOUTUBE_UPLOAD_BASE = 'https://www.googleapis.com/upload/youtube/v3';
+const YOUTUBE_THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
 
 /**
  * Initialize YouTube OAuth2 Client
@@ -255,14 +257,18 @@ async function uploadVideo(user, videoData) {
 
     console.log('✅ Video uploaded successfully:', youtubeUrl);
 
+    let thumbnailApplied = false;
+    let thumbnailError = null;
+
     // Upload thumbnail if provided
     if (thumbnailUrl) {
       try {
         await uploadThumbnail(oauth2Client, videoId, thumbnailUrl);
+        thumbnailApplied = true;
         console.log('✅ Thumbnail uploaded');
       } catch (thumbError) {
         console.error('❌ Thumbnail upload failed:', thumbError.message);
-        // Don't fail the whole upload if thumbnail fails
+        thumbnailError = thumbError.message;
       }
     }
 
@@ -272,7 +278,9 @@ async function uploadVideo(user, videoData) {
       videoUrl: youtubeUrl,
       title: uploadResponse.data.snippet.title,
       publishedAt: uploadResponse.data.snippet.publishedAt,
-      privacyStatus: uploadResponse.data.status.privacyStatus
+      privacyStatus: uploadResponse.data.status.privacyStatus,
+      thumbnailApplied,
+      thumbnailError,
     };
 
   } catch (error) {
@@ -327,28 +335,27 @@ async function uploadThumbnail(oauth2Client, videoId, thumbnailUrl) {
       auth: oauth2Client
     });
 
-    let media;
+    let thumbnailBuffer;
     if (thumbnailUrl.startsWith('http://') || thumbnailUrl.startsWith('https://')) {
       // Download thumbnail from URL
       const response = await axios.get(thumbnailUrl, {
         responseType: 'arraybuffer',
-        maxContentLength: 2 * 1024 * 1024 // 2 MB max
+        maxContentLength: 12 * 1024 * 1024,
       });
-      media = {
-        body: Buffer.from(response.data)
-      };
+      thumbnailBuffer = Buffer.from(response.data);
     } else if (thumbnailUrl.startsWith('data:')) {
       // Base64 thumbnail
       const base64Data = thumbnailUrl.replace(/^data:image\/\w+;base64,/, '');
-      media = {
-        body: Buffer.from(base64Data, 'base64')
-      };
+      thumbnailBuffer = Buffer.from(base64Data, 'base64');
     } else {
       // Local file
-      media = {
-        body: fs.createReadStream(thumbnailUrl)
-      };
+      thumbnailBuffer = await fs.promises.readFile(thumbnailUrl);
     }
+
+    const media = {
+      mimeType: 'image/jpeg',
+      body: await prepareYoutubeThumbnailBuffer(thumbnailBuffer),
+    };
 
     await youtube.thumbnails.set({
       videoId: videoId,
@@ -360,6 +367,37 @@ async function uploadThumbnail(oauth2Client, videoId, thumbnailUrl) {
     console.error('Thumbnail upload error:', error);
     throw error;
   }
+}
+
+async function prepareYoutubeThumbnailBuffer(inputBuffer) {
+  const widths = [1280, 960, 720];
+  const qualities = [88, 80, 72, 64, 56];
+
+  for (const width of widths) {
+    for (const quality of qualities) {
+      const output = await sharp(inputBuffer)
+        .rotate()
+        .resize({
+          width,
+          height: Math.round((width / 16) * 9),
+          fit: 'cover',
+          position: 'centre',
+          withoutEnlargement: false,
+        })
+        .jpeg({
+          quality,
+          mozjpeg: true,
+          chromaSubsampling: '4:4:4',
+        })
+        .toBuffer();
+
+      if (output.length <= YOUTUBE_THUMBNAIL_MAX_BYTES) {
+        return output;
+      }
+    }
+  }
+
+  throw new Error('Custom thumbnail exceeds YouTube limits after optimization');
 }
 
 /**

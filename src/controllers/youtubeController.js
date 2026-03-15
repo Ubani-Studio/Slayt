@@ -23,6 +23,16 @@ const normalizeScheduledDate = (scheduledDate) => {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
+const VALID_PRIVACY_STATUSES = new Set(['private', 'unlisted', 'public']);
+
+const normalizePrivacyStatus = (privacyStatus) => {
+  if (privacyStatus === undefined) {
+    return undefined;
+  }
+
+  return VALID_PRIVACY_STATUSES.has(privacyStatus) ? privacyStatus : null;
+};
+
 const resolveThumbnailMode = (thumbnailMode, thumbnailUrl = '') => {
   if (thumbnailMode === 'custom' || thumbnailMode === 'auto') {
     return thumbnailMode;
@@ -267,6 +277,98 @@ exports.updateCollection = async (req, res) => {
   }
 };
 
+exports.scheduleCollection = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { entries } = req.body || {};
+
+    if (!validateObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid collection ID' });
+    }
+
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({ error: 'Schedule entries are required' });
+    }
+
+    const collection = await YoutubeCollection.findOne({
+      _id: id,
+      userId: req.user._id,
+    });
+
+    if (!collection) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+
+    const normalizedEntries = [];
+    const seenVideoIds = new Set();
+
+    for (const entry of entries) {
+      if (!entry?.videoId || !validateObjectId(entry.videoId)) {
+        return res.status(400).json({ error: 'Each schedule entry must include a valid video ID' });
+      }
+
+      if (seenVideoIds.has(entry.videoId)) {
+        return res.status(400).json({ error: 'Duplicate video IDs are not allowed in a collection schedule request' });
+      }
+
+      const resolvedScheduledDate = normalizeScheduledDate(entry.scheduledDate);
+      if (!resolvedScheduledDate) {
+        return res.status(400).json({ error: 'Each schedule entry must include a valid scheduled date' });
+      }
+
+      seenVideoIds.add(entry.videoId);
+      normalizedEntries.push({
+        videoId: entry.videoId,
+        scheduledDate: resolvedScheduledDate,
+      });
+    }
+
+    const scheduledVideos = await YoutubeVideo.find({
+      _id: { $in: normalizedEntries.map((entry) => entry.videoId) },
+      collectionId: id,
+      userId: req.user._id,
+    }).select('_id status');
+
+    if (scheduledVideos.length !== normalizedEntries.length) {
+      return res.status(404).json({ error: 'One or more videos could not be found in this collection' });
+    }
+
+    const updatedAt = new Date();
+    await YoutubeVideo.bulkWrite(
+      normalizedEntries.map((entry) => ({
+        updateOne: {
+          filter: {
+            _id: entry.videoId,
+            collectionId: id,
+            userId: req.user._id,
+          },
+          update: {
+            $set: {
+              scheduledDate: entry.scheduledDate,
+              status: 'scheduled',
+              updatedAt,
+            },
+          },
+        },
+      })),
+    );
+
+    const videos = await YoutubeVideo.find({
+      collectionId: id,
+      userId: req.user._id,
+    }).sort({ position: 1 });
+
+    res.json({
+      message: 'Collection scheduled successfully',
+      scheduledCount: normalizedEntries.length,
+      videos: await serializeVideoCollection(videos),
+    });
+  } catch (error) {
+    console.error('Schedule YouTube collection error:', error);
+    res.status(500).json({ error: 'Failed to schedule collection' });
+  }
+};
+
 // Delete collection
 exports.deleteCollection = async (req, res) => {
   try {
@@ -312,6 +414,7 @@ exports.createVideo = async (req, res) => {
       thumbnailOriginalUrl: providedThumbnailOriginalUrl,
       collectionId,
       status,
+      privacyStatus,
       scheduledDate,
       position,
       tags,
@@ -384,6 +487,10 @@ exports.createVideo = async (req, res) => {
     if (scheduledDate && !resolvedScheduledDate) {
       return res.status(400).json({ error: 'Invalid scheduled date' });
     }
+    const resolvedPrivacyStatus = normalizePrivacyStatus(privacyStatus);
+    if (privacyStatus !== undefined && !resolvedPrivacyStatus) {
+      return res.status(400).json({ error: 'Invalid privacy status' });
+    }
 
     const video = new YoutubeVideo({
       userId: req.user._id,
@@ -395,6 +502,7 @@ exports.createVideo = async (req, res) => {
       thumbnailStatus: resolvedThumbnailStatus,
       collectionId: collectionId || null,
       status: status || 'draft',
+      privacyStatus: resolvedPrivacyStatus || 'public',
       scheduledDate: resolvedScheduledDate || null,
       position: videoPosition || 0,
       tags: tags || [],
@@ -728,6 +836,14 @@ exports.updateVideo = async (req, res) => {
       updates.scheduledDate = resolvedScheduledDate;
     }
 
+    if (updates.privacyStatus !== undefined) {
+      const resolvedPrivacyStatus = normalizePrivacyStatus(updates.privacyStatus);
+      if (!resolvedPrivacyStatus) {
+        return res.status(400).json({ error: 'Invalid privacy status' });
+      }
+      updates.privacyStatus = resolvedPrivacyStatus;
+    }
+
     if (updates.thumbnail !== undefined || updates.thumbnailMode !== undefined || updates.thumbnailStatus !== undefined) {
       const nextThumbnail = updates.thumbnail !== undefined ? updates.thumbnail : video.thumbnail;
       const nextMode = resolveThumbnailMode(updates.thumbnailMode || video.thumbnailMode, nextThumbnail);
@@ -749,6 +865,7 @@ exports.updateVideo = async (req, res) => {
       'thumbnailStatus',
       'collectionId',
       'status',
+      'privacyStatus',
       'scheduledDate',
       'position',
       'tags',

@@ -162,7 +162,7 @@ class SchedulingService {
         title: video.title || 'Untitled Video',
         description: video.description || '',
         tags: video.tags || [],
-        privacyStatus: 'private',
+        privacyStatus: video.privacyStatus || 'public',
         thumbnailUrl: video.thumbnail || null,
       });
 

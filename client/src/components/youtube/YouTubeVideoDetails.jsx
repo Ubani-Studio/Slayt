@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { intelligenceApi, youtubeApi } from '../../lib/api';
+import YouTubeSchedulePopover from './YouTubeSchedulePopover';
 import {
   extractVideoFrame,
   formatDuration,
@@ -8,9 +9,13 @@ import {
   hasPlannerVideoAttachment,
 } from '../../lib/videoUtils';
 import {
+  formatScheduleSummary,
+  toDateInputValue,
+  toTimeInputValue,
+} from '../../lib/youtubeSchedule';
+import {
   Image,
   Type,
-  Calendar,
   Trash2,
   Upload,
   Copy,
@@ -22,12 +27,9 @@ import {
   AlertCircle,
   FileText,
   Clock,
-  Sparkles,
   RefreshCw,
   ChevronDown,
-  Star,
   Check,
-  Dice5,
   ThumbsDown,
   SkipForward,
   X,
@@ -39,23 +41,15 @@ const STATUS_OPTIONS = [
   { value: 'published', label: 'Published', color: 'bg-dark-100' },
 ];
 
+const VISIBILITY_OPTIONS = [
+  { value: 'public', label: 'Public' },
+  { value: 'unlisted', label: 'Unlisted' },
+  { value: 'private', label: 'Private' },
+];
+
 // YouTube title character limits
 const TITLE_MAX = 100;
 const TITLE_VISIBLE = 60; // Characters visible in search results
-
-const toDateInputValue = (value) => {
-  if (!value) return '';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '';
-  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
-};
-
-const toTimeInputValue = (value) => {
-  if (!value) return '12:00';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '12:00';
-  return `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`;
-};
 
 const buildVideoPersistencePayload = (video = {}) => ({
   storageProvider: video.storageProvider || (video.muxAssetId || video.muxUploadId ? 'mux' : 'legacy'),
@@ -156,6 +150,7 @@ function YouTubeVideoDetails({
   const [showArtistSuggestions, setShowArtistSuggestions] = useState(false);
   const artistInputRef = useRef(null);
   const [status, setStatus] = useState(video?.status || 'draft');
+  const [privacyStatus, setPrivacyStatus] = useState(video?.privacyStatus || 'public');
   const [scheduledDate, setScheduledDate] = useState(toDateInputValue(video?.scheduledDate));
   const [scheduledTime, setScheduledTime] = useState(toTimeInputValue(video?.scheduledDate));
   const [showTruncatePreview, setShowTruncatePreview] = useState(false);
@@ -164,10 +159,10 @@ function YouTubeVideoDetails({
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const previewVideoRef = useRef(null);
   const [showVideoFile, setShowVideoFile] = useState(true);
+  const [showSchedulePopover, setShowSchedulePopover] = useState(false);
   const [isDraggingVideoFile, setIsDraggingVideoFile] = useState(false);
   const [videoUploadProgress, setVideoUploadProgress] = useState(null);
   const [showDescription, setShowDescription] = useState(true);
-  const [showSchedule, setShowSchedule] = useState(true);
 
   // AI Generation state
   const [showAIPanel, setShowAIPanel] = useState(false);
@@ -194,9 +189,11 @@ function YouTubeVideoDetails({
       setDescription(video.description || '');
       setArtistName(video.artistName || '');
       setStatus(video.status || 'draft');
+      setPrivacyStatus(video.privacyStatus || 'public');
       setScheduledDate(toDateInputValue(video.scheduledDate));
       setScheduledTime(toTimeInputValue(video.scheduledDate));
       setIsDraggingVideoFile(false);
+      setShowSchedulePopover(false);
       setVideoUploadProgress(null);
       videoFileDragCounterRef.current = 0;
       lastSavedRef.current = {
@@ -412,36 +409,51 @@ function YouTubeVideoDetails({
 
   const handleStatusChange = (newStatus) => {
     if (newStatus === 'scheduled' && !hasVideoAsset) {
-      alert('Upload a video file before scheduling this YouTube item.');
+      setShowSchedulePopover(true);
       return;
     }
     if (newStatus === 'scheduled' && !scheduledDate) {
-      alert('Set a schedule date and time before marking this YouTube item as scheduled.');
+      setShowSchedulePopover(true);
       return;
     }
     setStatus(newStatus);
     persistVideoUpdates({ status: newStatus });
   };
 
-  const handleScheduleChange = () => {
-    if (scheduledDate && !hasVideoAsset) {
-      alert('Upload a video file before scheduling this YouTube item.');
+  const handleVisibilityChange = (nextVisibility) => {
+    setPrivacyStatus(nextVisibility);
+    persistVideoUpdates({ privacyStatus: nextVisibility });
+  };
+
+  const handleScheduleApply = ({ scheduledDate: nextDate, scheduledTime: nextTime }) => {
+    if (!hasVideoAsset) {
       return;
     }
 
-    const nextStatus = scheduledDate
-      ? 'scheduled'
-      : status === 'scheduled'
-        ? 'draft'
-        : status;
-    const scheduledAt = scheduledDate
-      ? new Date(`${scheduledDate}T${scheduledTime || '12:00'}`)
+    const resolvedDate = nextDate || '';
+    const resolvedTime = nextTime || '12:00';
+    const nextStatus = resolvedDate ? 'scheduled' : status === 'scheduled' ? 'draft' : status;
+    const scheduledAt = resolvedDate
+      ? new Date(`${resolvedDate}T${resolvedTime}`)
       : null;
 
     setStatus(nextStatus);
+    setScheduledDate(resolvedDate);
+    setScheduledTime(resolvedTime);
     persistVideoUpdates({
       scheduledDate: scheduledAt ? scheduledAt.toISOString() : null,
       status: nextStatus,
+    });
+  };
+
+  const handleScheduleClear = () => {
+    const nextStatus = status === 'scheduled' ? 'draft' : status;
+    setStatus(nextStatus);
+    setScheduledDate('');
+    setScheduledTime('12:00');
+    persistVideoUpdates({
+      scheduledDate: null,
+      ...(status === 'scheduled' ? { status: 'draft' } : {}),
     });
   };
 
@@ -771,6 +783,10 @@ function YouTubeVideoDetails({
   const titleLength = title.length;
   const isTitleLong = titleLength > TITLE_VISIBLE;
   const truncatedTitle = isTitleLong ? title.slice(0, TITLE_VISIBLE) + '...' : title;
+  const scheduledSummary = scheduledDate
+    ? formatScheduleSummary(new Date(`${scheduledDate}T${scheduledTime || '12:00'}`))
+    : null;
+  const visibilityLabel = VISIBILITY_OPTIONS.find((option) => option.value === privacyStatus)?.label || 'Public';
 
   return (
     <div className="h-full bg-dark-800 rounded-2xl border border-dark-700 flex flex-col overflow-hidden">
@@ -778,20 +794,6 @@ function YouTubeVideoDetails({
       <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-dark-100">Video Details</h2>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              setShowAIPanel(true);
-              const prompt = buildTastePrompt();
-              if (!generating) {
-                handleGenerateAI(prompt, true);
-              }
-            }}
-            disabled={generating}
-            className="p-1.5 text-dark-400 hover:text-dark-200 hover:bg-dark-700 rounded-lg transition-colors disabled:opacity-50"
-            title="Quick generate"
-          >
-            <Sparkles className="w-4 h-4" />
-          </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
             className="p-1.5 text-dark-400 hover:text-dark-200 hover:bg-dark-700 rounded-lg transition-colors"
@@ -876,6 +878,76 @@ function YouTubeVideoDetails({
                   ? 'Video-frame thumbnail'
                   : 'Thumbnail missing'}
           </span>
+        </div>
+
+        <div className="relative rounded-2xl border border-dark-700 bg-dark-900/30 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-[0.16em] text-dark-500">Release</p>
+              <p className="mt-1 text-sm font-medium text-dark-100">
+                {scheduledSummary || 'Not scheduled'}
+              </p>
+              <p className="mt-1 text-xs text-dark-300">
+                Visibility: <span className="text-dark-100">{visibilityLabel}</span>
+              </p>
+              <p className="mt-1 text-xs text-dark-400">
+                {scheduledSummary
+                  ? `This is when Slayt will send the upload as ${visibilityLabel.toLowerCase()}.`
+                  : hasVideoAsset
+                    ? `Pick a day and time for this ${visibilityLabel.toLowerCase()} upload.`
+                    : 'Attach a video to unlock scheduling.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {scheduledSummary && (
+                <button
+                  type="button"
+                  onClick={handleScheduleClear}
+                  className="rounded-lg px-3 py-2 text-xs text-dark-300 transition-colors hover:bg-dark-700 hover:text-dark-100"
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowSchedulePopover((current) => !current)}
+                className="rounded-lg bg-dark-100 px-3 py-2 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
+              >
+                {scheduledSummary ? 'Reschedule' : 'Schedule'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dark-700/60 bg-black/40 px-3 py-2">
+            <span className="text-xs font-medium text-dark-400">Visibility</span>
+            <select
+              value={privacyStatus}
+              onChange={(event) => handleVisibilityChange(event.target.value)}
+              className="min-w-[8.5rem] appearance-none rounded-lg border border-dark-700/70 bg-black px-2.5 py-1.5 text-sm text-dark-100 focus:outline-none focus:border-dark-500"
+              style={{ colorScheme: 'dark' }}
+              title="Choose how this video will appear on YouTube"
+            >
+              {VISIBILITY_OPTIONS.map((option) => (
+                <option
+                  key={option.value}
+                  value={option.value}
+                  style={{ backgroundColor: '#000000', color: '#f5f5f5' }}
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <YouTubeSchedulePopover
+            isOpen={showSchedulePopover}
+            scheduledDate={scheduledDate}
+            scheduledTime={scheduledTime}
+            canSchedule={hasVideoAsset}
+            onApply={handleScheduleApply}
+            onClear={handleScheduleClear}
+            onClose={() => setShowSchedulePopover(false)}
+          />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -1328,43 +1400,6 @@ function YouTubeVideoDetails({
           </div>
         </div>
 
-        {/* Schedule */}
-        <div>
-          <button
-            onClick={() => setShowSchedule(!showSchedule)}
-            className="w-full flex items-center justify-between mb-2 hover:opacity-80 transition-opacity"
-          >
-            <label className="flex items-center gap-2 text-sm font-medium text-dark-200 cursor-pointer">
-              <Calendar className="w-4 h-4" />
-              Schedule
-              {scheduledDate && (
-                <span className="text-xs text-dark-400">
-                  ({new Date(`${scheduledDate}T${scheduledTime || '12:00'}`).toLocaleDateString()})
-                </span>
-              )}
-            </label>
-            <ChevronDown className={`w-4 h-4 text-dark-400 transition-transform ${showSchedule ? 'rotate-180' : ''}`} />
-          </button>
-          {showSchedule && (
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="date"
-                value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-                onBlur={handleScheduleChange}
-                className="input"
-                min={new Date().toISOString().split('T')[0]}
-              />
-              <input
-                type="time"
-                value={scheduledTime}
-                onChange={(e) => setScheduledTime(e.target.value)}
-                onBlur={handleScheduleChange}
-                className="input"
-              />
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Delete Confirmation Modal */}

@@ -86,6 +86,11 @@ const youtubeVideoSchema = new mongoose.Schema({
     enum: ['draft', 'scheduled', 'published', 'failed'],
     default: 'draft'
   },
+  privacyStatus: {
+    type: String,
+    enum: ['private', 'unlisted', 'public'],
+    default: 'public'
+  },
   scheduledDate: {
     type: Date
   },

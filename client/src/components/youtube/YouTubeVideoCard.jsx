@@ -15,7 +15,7 @@ const STATUS_LABELS = {
   published: 'Published',
 };
 
-function YouTubeVideoCard({ video, isSelected, isLocked, isDropTarget, onClick, onDelete }) {
+function YouTubeVideoCard({ video, displayIndex, isSelected, isLocked, isDropTarget, onClick, onDelete }) {
   const {
     attributes,
     listeners,
@@ -38,6 +38,8 @@ function YouTubeVideoCard({ video, isSelected, isLocked, isDropTarget, onClick, 
   const isTitleTruncated = titleLength > 60;
   const durationLabel = formatDuration(video.durationSeconds);
   const assetState = getPlannerVideoAssetState(video);
+  const queueNumber = Number.isFinite(displayIndex) ? displayIndex + 1 : (video.position ?? 0) + 1;
+  const isFirstInQueue = queueNumber === 1;
 
   return (
     <div
@@ -77,6 +79,17 @@ function YouTubeVideoCard({ video, isSelected, isLocked, isDropTarget, onClick, 
           </div>
         )}
 
+        <div className="absolute right-2 top-2 flex items-center gap-1">
+          {isFirstInQueue && (
+            <span className="rounded bg-dark-100/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-dark-900">
+              Next up
+            </span>
+          )}
+          <span className="rounded bg-black/80 px-2 py-0.5 text-xs font-semibold text-white">
+            #{queueNumber}
+          </span>
+        </div>
+
         {/* Duration placeholder (if we add it later) */}
         {(video.duration || video.durationSeconds) && (
           <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 rounded text-xs text-white font-medium">
@@ -112,6 +125,9 @@ function YouTubeVideoCard({ video, isSelected, isLocked, isDropTarget, onClick, 
 
         {/* Character count indicator */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-dark-800 px-2 py-0.5 text-[10px] font-medium text-dark-300">
+            {isFirstInQueue ? 'First in queue' : `Queue position #${queueNumber}`}
+          </span>
           {assetState === 'missing' && (
             <span className="rounded-full bg-dark-600 px-2 py-0.5 text-[10px] text-dark-200">
               Thumbnail only
@@ -142,11 +158,6 @@ function YouTubeVideoCard({ video, isSelected, isLocked, isDropTarget, onClick, 
             <span className="text-xs text-amber-400">Title may be cut off</span>
           )}
         </div>
-      </div>
-
-      {/* Position Number */}
-      <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/60 rounded text-xs text-white/80 font-medium">
-        {(video.position ?? 0) + 1}
       </div>
     </div>
   );

@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 // Sortable list item component
-function SortableVideoItem({ video, isSelected, isLocked, isDropTarget, onClick, onDelete }) {
+function SortableVideoItem({ video, displayIndex, isSelected, isLocked, isDropTarget, onClick, onDelete }) {
   const {
     attributes,
     listeners,
@@ -58,6 +58,8 @@ function SortableVideoItem({ video, isSelected, isLocked, isDropTarget, onClick,
   };
   const durationLabel = formatDuration(video.durationSeconds);
   const assetState = getPlannerVideoAssetState(video);
+  const queueNumber = Number.isFinite(displayIndex) ? displayIndex + 1 : (video.position ?? 0) + 1;
+  const isFirstInQueue = queueNumber === 1;
 
   return (
     <div
@@ -100,10 +102,23 @@ function SortableVideoItem({ video, isSelected, isLocked, isDropTarget, onClick,
         <div className="absolute bottom-1 right-1 px-1 py-0.5 bg-black/80 rounded text-[10px] text-white font-medium">
           {video.duration || durationLabel}
         </div>
+        <div className="absolute left-1 top-1 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          #{queueNumber}
+        </div>
       </div>
 
       {/* Video Info */}
       <div className="flex-1 min-w-0">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-dark-800 px-2 py-0.5 text-[10px] font-medium text-dark-300">
+            {isFirstInQueue ? 'First in queue' : `Queue #${queueNumber}`}
+          </span>
+          {isFirstInQueue && (
+            <span className="rounded-full bg-dark-100/15 px-2 py-0.5 text-[10px] font-medium text-dark-100">
+              Next up
+            </span>
+          )}
+        </div>
         <h4 className="text-sm font-medium text-dark-100 truncate">
           {video.artistName ? `${video.artistName} - ${video.title}` : video.title || 'Untitled Video'}
         </h4>
@@ -307,10 +322,11 @@ function YouTubeSidebarView({ isLocked, onUpload }) {
             strategy={() => null}
           >
             <div className="space-y-2">
-              {youtubeVideos.map((video) => (
+              {youtubeVideos.map((video, index) => (
                 <SortableVideoItem
                   key={video.id}
                   video={video}
+                  displayIndex={index}
                   isSelected={video.id === selectedYoutubeVideoId}
                   isLocked={isLocked}
                   isDropTarget={video.id === overItemId}

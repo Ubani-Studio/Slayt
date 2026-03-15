@@ -10,6 +10,7 @@ import YouTubeVideoDetails from '../components/youtube/YouTubeVideoDetails';
 import YouTubeThumbnailEditor from '../components/youtube/YouTubeThumbnailEditor';
 import YouTubeCollectionsManager from '../components/youtube/YouTubeCollectionsManager';
 import YouTubeBulkReplace from '../components/youtube/YouTubeBulkReplace';
+import YouTubeCollectionScheduleModal from '../components/youtube/YouTubeCollectionScheduleModal';
 import {
   Lock,
   Unlock,
@@ -35,6 +36,7 @@ import {
   History,
   Images,
   Package,
+  Calendar,
 } from 'lucide-react';
 
 // Preset colors for collections
@@ -144,12 +146,17 @@ function YouTubePlanner() {
   const [editingThumbnailSourceFilename, setEditingThumbnailSourceFilename] = useState('');
   const [editingVideoId, setEditingVideoId] = useState(null);
   const [showBulkReplace, setShowBulkReplace] = useState(false);
+  const [showCollectionSchedule, setShowCollectionSchedule] = useState(false);
+  const [collectionScheduling, setCollectionScheduling] = useState(false);
   const [bulkReplaceScope, setBulkReplaceScope] = useState('collection');
   const [collectionsCollapsed, setCollectionsCollapsed] = useState(false);
   const [videoClipboard, setVideoClipboard] = useState(null);
   const [thumbnailPreference, setThumbnailPreference] = useState(() => {
     return localStorage.getItem('youtubeThumbnailPreference') || 'custom';
   });
+  const [plannerNotices, setPlannerNotices] = useState([]);
+  const plannerNoticeTimeoutsRef = useRef(new Map());
+  const videoStatusSnapshotRef = useRef(new Map());
 
   // Loading and error states for cloud sync
   const [loading, setLoading] = useState(true);
@@ -189,6 +196,108 @@ function YouTubePlanner() {
   const currentCollection = youtubeCollections?.find(c => (c._id || c.id) === currentYoutubeCollectionId)
     || youtubeCollections?.[0]
     || { id: 'default', name: 'My Videos' };
+
+  const dismissPlannerNotice = useCallback((noticeId) => {
+    setPlannerNotices((current) => current.filter((notice) => notice.id !== noticeId));
+    const timeoutId = plannerNoticeTimeoutsRef.current.get(noticeId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      plannerNoticeTimeoutsRef.current.delete(noticeId);
+    }
+  }, []);
+
+  const pushPlannerNotice = useCallback(({ title, message, tone = 'neutral' }) => {
+    const noticeId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setPlannerNotices((current) => [
+      ...current.slice(-2),
+      { id: noticeId, title, message, tone },
+    ]);
+
+    const timeoutId = window.setTimeout(() => {
+      setPlannerNotices((current) => current.filter((notice) => notice.id !== noticeId));
+      plannerNoticeTimeoutsRef.current.delete(noticeId);
+    }, 7000);
+
+    plannerNoticeTimeoutsRef.current.set(noticeId, timeoutId);
+  }, []);
+
+  const maybeSendBrowserNotice = useCallback(({ title, message, tag }) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return;
+    }
+
+    if (window.Notification.permission !== 'granted' || !document.hidden) {
+      return;
+    }
+
+    try {
+      new window.Notification(title, {
+        body: message,
+        tag,
+      });
+    } catch (error) {
+      console.error('Failed to show browser notification:', error);
+    }
+  }, []);
+
+  const syncPlannerVideoStatusSnapshot = useCallback((videos, { announceChanges = false } = {}) => {
+    const previousSnapshot = videoStatusSnapshotRef.current;
+    const nextSnapshot = new Map();
+
+    videos.forEach((video) => {
+      const videoId = video._id || video.id;
+      if (!videoId) {
+        return;
+      }
+
+      nextSnapshot.set(videoId, {
+        status: video.status || 'draft',
+        title: video.title || 'Untitled video',
+        lastError: video.lastError || '',
+        youtubeVideoUrl: video.youtubeVideoUrl || '',
+      });
+
+      if (!announceChanges) {
+        return;
+      }
+
+      const previous = previousSnapshot.get(videoId);
+      if (!previous || previous.status === video.status) {
+        return;
+      }
+
+      if (previous.status === 'scheduled' && video.status === 'published') {
+        const title = video.title || 'Untitled video';
+        pushPlannerNotice({
+          title: 'YouTube upload complete',
+          message: `"${title}" is now on YouTube.`,
+          tone: 'success',
+        });
+        maybeSendBrowserNotice({
+          title: 'Slayt: YouTube upload complete',
+          message: title,
+          tag: `youtube-published-${videoId}`,
+        });
+      }
+
+      if (previous.status === 'scheduled' && video.status === 'failed') {
+        const title = video.title || 'Untitled video';
+        const reason = video.lastError || 'The upload could not be completed.';
+        pushPlannerNotice({
+          title: 'YouTube upload failed',
+          message: `"${title}" failed: ${reason}`,
+          tone: 'error',
+        });
+        maybeSendBrowserNotice({
+          title: 'Slayt: YouTube upload failed',
+          message: `${title}: ${reason}`,
+          tag: `youtube-failed-${videoId}`,
+        });
+      }
+    });
+
+    videoStatusSnapshotRef.current = nextSnapshot;
+  }, [maybeSendBrowserNotice, pushPlannerNotice]);
 
   // Fetch collections from backend
   const fetchCollections = useCallback(async () => {
@@ -232,7 +341,7 @@ function YouTubePlanner() {
   }, [currentYoutubeCollectionId]);
 
   // Fetch videos for a specific collection
-  const fetchVideosForCollection = useCallback(async (collectionId) => {
+  const fetchVideosForCollection = useCallback(async (collectionId, options = {}) => {
     if (!collectionId) return;
     try {
       const data = await youtubeApi.getVideos(collectionId);
@@ -244,11 +353,12 @@ function YouTubePlanner() {
         id: v._id,
       }));
 
+      syncPlannerVideoStatusSnapshot(transformedVideos, options);
       setYoutubeVideos(transformedVideos);
     } catch (err) {
       console.error('Failed to fetch videos for collection:', err);
     }
-  }, [setYoutubeVideos]);
+  }, [setYoutubeVideos, syncPlannerVideoStatusSnapshot]);
 
   // Load data on mount
   useEffect(() => {
@@ -261,6 +371,47 @@ function YouTubePlanner() {
       fetchVideosForCollection(currentYoutubeCollectionId);
     }
   }, [currentYoutubeCollectionId]);
+
+  useEffect(() => {
+    return () => {
+      plannerNoticeTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+      plannerNoticeTimeoutsRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentYoutubeCollectionId) {
+      return undefined;
+    }
+
+    const hasScheduledVideos = youtubeVideos.some((video) => video.status === 'scheduled');
+    if (!hasScheduledVideos) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+
+    const pollScheduledVideos = async () => {
+      if (cancelled || inFlight) {
+        return;
+      }
+
+      inFlight = true;
+      try {
+        await fetchVideosForCollection(currentYoutubeCollectionId, { announceChanges: true });
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const intervalId = window.setInterval(pollScheduledVideos, 15000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [currentYoutubeCollectionId, fetchVideosForCollection, youtubeVideos]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -752,6 +903,7 @@ function YouTubePlanner() {
           thumbnail,
           collectionId: currentYoutubeCollectionId,
           status: 'draft',
+          privacyStatus: 'public',
           originalFilename: file.name,
           thumbnailMode: 'custom',
           thumbnailStatus: 'custom',
@@ -870,6 +1022,7 @@ function YouTubePlanner() {
           thumbnail: videoAsset.thumbnailDataUrl,
           collectionId: currentYoutubeCollectionId,
           status: 'draft',
+          privacyStatus: 'public',
           originalFilename: file.name,
           thumbnailMode: thumbnailChoice.thumbnailMode,
           thumbnailStatus: thumbnailChoice.thumbnailStatus,
@@ -969,6 +1122,7 @@ function YouTubePlanner() {
         thumbnailMode: video.thumbnailMode || 'custom',
         thumbnailStatus: video.thumbnailStatus || (video.thumbnail ? 'custom' : 'missing'),
         status: video.status || 'draft',
+        privacyStatus: video.privacyStatus || 'public',
         scheduledDate: video.scheduledDate || null,
         tags: video.tags || [],
         originalFilename: video.originalFilename || '',
@@ -996,6 +1150,7 @@ function YouTubePlanner() {
         thumbnailMode: video.thumbnailMode || 'custom',
         thumbnailStatus: video.thumbnailStatus || (video.thumbnail ? 'custom' : 'missing'),
         status: video.status || 'draft',
+        privacyStatus: video.privacyStatus || 'public',
         scheduledDate: video.scheduledDate || null,
         tags: video.tags || [],
         originalFilename: video.originalFilename || '',
@@ -1069,6 +1224,32 @@ function YouTubePlanner() {
     console.log('Export functionality coming in Phase 3');
   };
 
+  const handleApplyCollectionSchedule = useCallback(async ({ entries }) => {
+    if (!currentYoutubeCollectionId || !Array.isArray(entries) || entries.length === 0) {
+      return;
+    }
+
+    setCollectionScheduling(true);
+    setSyncing(true);
+    setError(null);
+
+    try {
+      const data = await youtubeApi.scheduleCollection(currentYoutubeCollectionId, entries);
+      const videos = (data.videos || []).map((video) => ({
+        ...video,
+        id: video._id || video.id,
+      }));
+      setYoutubeVideos(videos);
+      setShowCollectionSchedule(false);
+    } catch (err) {
+      console.error('Failed to schedule collection:', err);
+      setError(err.response?.data?.error || 'Failed to schedule collection.');
+    } finally {
+      setCollectionScheduling(false);
+      setSyncing(false);
+    }
+  }, [currentYoutubeCollectionId, setYoutubeVideos]);
+
   return (
     <div className="youtube-native h-full flex gap-6 relative">
       {/* Upload Progress Overlay */}
@@ -1129,6 +1310,41 @@ function YouTubePlanner() {
         <div className="absolute top-4 right-4 z-40 bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 flex items-center gap-2">
           <Loader2 className="w-4 h-4 text-dark-300 animate-spin" />
           <span className="text-sm text-dark-300">Syncing...</span>
+        </div>
+      )}
+
+      {plannerNotices.length > 0 && (
+        <div className="absolute top-16 right-4 z-40 flex w-[22rem] max-w-[calc(100%-2rem)] flex-col gap-2">
+          {plannerNotices.map((notice) => {
+            const toneClasses =
+              notice.tone === 'success'
+                ? 'border-emerald-500/30 bg-emerald-500/10'
+                : notice.tone === 'error'
+                  ? 'border-red-500/30 bg-red-500/10'
+                  : 'border-dark-600 bg-dark-800/95';
+
+            return (
+              <div
+                key={notice.id}
+                className={`rounded-xl border px-3 py-3 shadow-xl backdrop-blur-sm ${toneClasses}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-dark-100">{notice.title}</p>
+                    <p className="mt-1 text-sm text-dark-300">{notice.message}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dismissPlannerNotice(notice.id)}
+                    className="rounded-md p-1 text-dark-500 transition-colors hover:bg-dark-700 hover:text-dark-200"
+                    title="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1461,7 +1677,7 @@ function YouTubePlanner() {
             )}
 
             {/* Video Count */}
-            <div className="flex shrink-0 items-center gap-2 h-9 px-2.5 sm:px-3 whitespace-nowrap border border-dark-700/60 bg-dark-800 rounded-lg">
+            <div className="flex shrink-0 items-center gap-2 h-9 px-2.5 sm:px-3 whitespace-nowrap border border-dark-700/60 bg-dark-800 rounded-lg" title={`${youtubeVideos.length} videos in this collection`}>
               <Youtube className="w-4 h-4 text-dark-100" />
               <span className="text-sm font-medium text-dark-200">{youtubeVideos.length}</span>
               <span className="hidden md:inline text-sm font-medium text-dark-200">Videos</span>
@@ -1553,6 +1769,15 @@ function YouTubePlanner() {
               <Images className="w-4 h-4 text-dark-400" />
             </button>
 
+            <button
+              onClick={() => setShowCollectionSchedule(true)}
+              className="flex items-center gap-2 h-9 px-3 border border-dark-700/60 bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
+              title="Schedule this collection in order"
+            >
+              <Calendar className="w-4 h-4 text-dark-300" />
+              <span className="text-sm text-dark-200">Schedule</span>
+            </button>
+
             {/* View Mode Toggle */}
             <div className="flex items-center h-9 border border-dark-700/60 bg-dark-800 rounded-lg p-1 gap-0.5">
               <button
@@ -1595,44 +1820,52 @@ function YouTubePlanner() {
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dark-700/40 bg-dark-900/20 p-2">
-            <div className="flex items-center gap-2 rounded-lg border border-dark-700/60 bg-dark-800 px-3 h-9">
-              <span className="text-xs uppercase tracking-[0.16em] text-dark-500">Thumbs</span>
-              <select
-                value={thumbnailPreference}
-                onChange={(e) => setThumbnailPreference(e.target.value)}
-                className="bg-transparent text-sm text-dark-200 focus:outline-none"
-                title="Default thumbnail workflow for uploaded videos"
-              >
-                <option value="custom">Prefer custom</option>
-                <option value="auto">Use video frame</option>
-                <option value="ask">Ask each upload</option>
-              </select>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dark-700/40 bg-dark-900/20 p-2.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex items-center gap-2 rounded-xl border border-dark-700/70 bg-dark-950/90 px-2.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                <span className="text-[11px] font-medium text-dark-500">Thumbnail</span>
+                <div className="relative">
+                  <select
+                    value={thumbnailPreference}
+                    onChange={(e) => setThumbnailPreference(e.target.value)}
+                    className="h-7 min-w-[9.5rem] appearance-none rounded-lg border border-dark-700/70 bg-black pl-2.5 pr-8 text-sm text-dark-100 focus:outline-none focus:border-dark-500"
+                    style={{ colorScheme: 'dark' }}
+                    title="Default thumbnail workflow for uploaded videos"
+                  >
+                    <option value="custom" style={{ backgroundColor: '#000000', color: '#f5f5f5' }}>Prefer custom</option>
+                    <option value="auto" style={{ backgroundColor: '#000000', color: '#f5f5f5' }}>Video frame</option>
+                    <option value="ask" style={{ backgroundColor: '#000000', color: '#f5f5f5' }}>Ask each time</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-dark-500" />
+                </div>
+              </div>
             </div>
 
-            {/* Export */}
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 h-9 px-3 border border-dark-700/60 bg-dark-800 text-dark-300 hover:text-dark-100 hover:bg-dark-700 rounded-lg transition-colors"
-              disabled
-              title="Coming in Phase 3"
-            >
-              <Download className="w-4 h-4" />
-              <span className="text-sm">Export</span>
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              {/* Export */}
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 h-8 px-3 rounded-lg border border-dark-700/60 bg-dark-900/70 text-dark-400 hover:text-dark-100 hover:bg-dark-800 transition-colors disabled:opacity-60"
+                disabled
+                title="Coming in Phase 3"
+              >
+                <Download className="w-4 h-4" />
+                <span className="text-sm">Export</span>
+              </button>
 
-            {/* Upload Button */}
-            <label className="flex items-center gap-2 h-9 px-3 border border-white/30 bg-dark-100 hover:bg-white text-dark-900 rounded-lg text-sm font-medium cursor-pointer transition-colors">
-              <Upload className="w-4 h-4" />
-              <span>Upload</span>
-              <input
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
+              {/* Upload Button */}
+              <label className="flex items-center gap-2 h-8 px-3.5 rounded-lg border border-[#f0ede8]/25 bg-[#f0ede8] text-[#111111] text-sm font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] transition-colors hover:bg-white cursor-pointer">
+                <Upload className="w-4 h-4" />
+                <span>Upload</span>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,video/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
           </div>
           </div>
         </div>
@@ -1701,6 +1934,16 @@ function YouTubePlanner() {
         onReplace={handleBulkReplaceSingle}
         scope={bulkReplaceScope}
         onScopeChange={setBulkReplaceScope}
+      />
+
+      <YouTubeCollectionScheduleModal
+        isOpen={showCollectionSchedule}
+        collectionName={currentCollection.name}
+        videos={youtubeVideos}
+        selectedVideoId={selectedYoutubeVideoId}
+        applying={collectionScheduling}
+        onClose={() => setShowCollectionSchedule(false)}
+        onApply={handleApplyCollectionSchedule}
       />
     </div>
   );
