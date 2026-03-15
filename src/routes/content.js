@@ -13,6 +13,7 @@ router.post('/reel', authenticate, upload.fields([
 // Content CRUD
 router.post('/', authenticate, upload.single('media'), contentController.createContent);
 router.get('/', authenticate, contentController.getAllContent);
+router.post('/sync-clarosa', authenticate, contentController.syncClarosaInsights);
 router.get('/:id', authenticate, contentController.getContentById);
 router.put('/:id', authenticate, contentController.updateContent);
 router.delete('/:id', authenticate, contentController.deleteContent);

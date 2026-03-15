@@ -6,6 +6,7 @@ import {
   formatScheduleDateOnly,
   toDateInputValue,
 } from '../../lib/youtubeSchedule';
+import { buildYoutubeUploadTitle } from '../../lib/youtubeUploadTitle';
 
 const CADENCE_OPTIONS = [
   {
@@ -275,7 +276,12 @@ function YouTubeCollectionScheduleModal({
                       <div className="min-w-0">
                         <div className="flex items-center justify-between gap-3">
                           <p className="truncate text-sm font-medium text-dark-100">
-                            {index + 1}. {entry.video.artistName ? `${entry.video.artistName} - ${entry.video.title}` : entry.video.title || 'Untitled video'}
+                            {index + 1}. {buildYoutubeUploadTitle({
+                              title: entry.video.title,
+                              artistName: entry.video.artistName,
+                              featuringArtists: entry.video.featuringArtists,
+                              fallbackTitle: 'Untitled video',
+                            })}
                           </p>
                           <span className="rounded-full bg-dark-700 px-2 py-1 text-[11px] uppercase tracking-[0.16em] text-dark-400">
                             {formatScheduleDateOnly(entry.scheduledAt)}

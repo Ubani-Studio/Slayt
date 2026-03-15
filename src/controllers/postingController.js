@@ -4,6 +4,32 @@ const Collection = require('../models/Collection');
 const Content = require('../models/Content');
 const User = require('../models/User');
 const approvalGateService = require('../services/approvalGateService');
+const {
+  normalizePlatforms,
+  getScheduledPlatforms,
+  setScheduledPlatforms,
+} = require('../utils/postingPlatforms');
+
+const publishToPlatform = async ({ user, content, platform, options, profileId = null }) => {
+  if (profileId) {
+    return socialMediaService.postWithProfile(profileId, content, { ...options, platform });
+  }
+
+  if (platform === 'instagram') {
+    return socialMediaService.postToInstagram(user, content, options);
+  }
+  if (platform === 'tiktok') {
+    return socialMediaService.postToTikTok(user, content, options);
+  }
+  if (platform === 'youtube') {
+    return socialMediaService.postToYouTube(user, content, options);
+  }
+  if (platform === 'both') {
+    return socialMediaService.postToBoth(user, content, options);
+  }
+
+  throw new Error(`Unsupported platform: ${platform}`);
+};
 
 /**
  * Manually post a single content item (legacy endpoint)
@@ -11,7 +37,7 @@ const approvalGateService = require('../services/approvalGateService');
 exports.postContent = async (req, res) => {
   try {
     const { contentId } = req.params;
-    const { platform, caption } = req.body;
+    const { platform, caption, hashtags, profileId } = req.body;
 
     const content = await Content.findOne({
       _id: contentId,
@@ -38,7 +64,9 @@ exports.postContent = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     // Validate credentials
-    const validation = await socialMediaService.validateCredentials(user, platform);
+    const validation = profileId
+      ? { valid: true }
+      : await socialMediaService.validateCredentials(user, platform);
     if (!validation.valid) {
       return res.status(400).json({
         error: validation.error,
@@ -47,18 +75,12 @@ exports.postContent = async (req, res) => {
     }
 
     // Post content
-    const options = { caption: caption || content.caption };
-    let result;
-
-    if (platform === 'instagram') {
-      result = await socialMediaService.postToInstagram(user, content, options);
-    } else if (platform === 'tiktok') {
-      result = await socialMediaService.postToTikTok(user, content, options);
-    } else if (platform === 'both') {
-      result = await socialMediaService.postToBoth(user, content, options);
-    } else {
-      return res.status(400).json({ error: 'Invalid platform' });
-    }
+    const options = {
+      caption: caption || content.caption,
+      description: caption || content.caption,
+      tags: Array.isArray(hashtags) ? hashtags : content.hashtags || [],
+    };
+    const result = await publishToPlatform({ user, content, platform, options, profileId });
 
     // Update content status
     if (result.success) {
@@ -93,7 +115,7 @@ exports.postContent = async (req, res) => {
  */
 exports.postNow = async (req, res) => {
   try {
-    const { contentId, platforms, caption, hashtags } = req.body;
+    const { contentId, platforms, caption, hashtags, profileId } = req.body;
 
     if (!contentId || !platforms) {
       return res.status(400).json({ error: 'Content ID and platforms are required' });
@@ -122,7 +144,11 @@ exports.postNow = async (req, res) => {
     }
 
     const user = await User.findById(req.user._id);
-    const platformArray = Array.isArray(platforms) ? platforms : [platforms];
+    const platformArray = normalizePlatforms(platforms);
+
+    if (platformArray.length === 0) {
+      return res.status(400).json({ error: 'At least one supported platform is required' });
+    }
 
     const results = {};
     const errors = [];
@@ -134,13 +160,19 @@ exports.postNow = async (req, res) => {
       finalCaption = `${finalCaption}\n\n${hashtagStr}`.trim();
     }
 
-    const options = { caption: finalCaption };
+    const options = {
+      caption: finalCaption,
+      description: finalCaption,
+      tags: Array.isArray(hashtags) ? hashtags : content.hashtags || [],
+    };
 
     // Post to each platform
     for (const platform of platformArray) {
       try {
         // Validate credentials
-        const validation = await socialMediaService.validateCredentials(user, platform);
+        const validation = profileId
+          ? { valid: true }
+          : await socialMediaService.validateCredentials(user, platform);
         if (!validation.valid) {
           errors.push({
             platform,
@@ -151,15 +183,7 @@ exports.postNow = async (req, res) => {
         }
 
         // Post to platform
-        let result;
-        if (platform === 'instagram') {
-          result = await socialMediaService.postToInstagram(user, content, options);
-        } else if (platform === 'tiktok') {
-          result = await socialMediaService.postToTikTok(user, content, options);
-        } else {
-          errors.push({ platform, error: `Unsupported platform: ${platform}` });
-          continue;
-        }
+        const result = await publishToPlatform({ user, content, platform, options, profileId });
 
         results[platform] = result;
 
@@ -383,12 +407,16 @@ exports.refreshInstagramToken = async (req, res) => {
 exports.schedulePost = async (req, res) => {
   try {
     // Support both frontend naming (platforms, scheduledAt) and original naming (platform, scheduledTime)
-    const { contentId, scheduledTime, scheduledAt, platform, platforms, autoPost } = req.body;
+    const { contentId, scheduledTime, scheduledAt, platform, platforms, autoPost, profileId, caption, hashtags } = req.body;
     const resolvedScheduledTime = scheduledTime || scheduledAt;
-    const resolvedPlatform = platform || (Array.isArray(platforms) ? platforms[0] : platforms) || 'instagram';
+    const resolvedPlatforms = normalizePlatforms(platforms || platform);
+    const resolvedAutoPost = typeof autoPost === 'boolean' ? autoPost : true;
 
     if (!contentId || !resolvedScheduledTime) {
       return res.status(400).json({ error: 'Content ID and scheduled time are required' });
+    }
+    if (resolvedPlatforms.length === 0) {
+      return res.status(400).json({ error: 'At least one supported platform is required' });
     }
 
     const content = await Content.findOne({
@@ -414,9 +442,16 @@ exports.schedulePost = async (req, res) => {
     }
 
     // Update content with scheduling info
+    if (caption !== undefined) {
+      content.caption = caption;
+    }
+    if (hashtags !== undefined) {
+      content.hashtags = hashtags;
+    }
     content.scheduledTime = new Date(resolvedScheduledTime);
-    content.scheduledPlatform = resolvedPlatform;
-    content.autoPost = autoPost || false;
+    setScheduledPlatforms(content, resolvedPlatforms);
+    content.scheduledProfileId = profileId || undefined;
+    content.autoPost = resolvedAutoPost;
     content.status = 'scheduled';
 
     await content.save();
@@ -427,6 +462,8 @@ exports.schedulePost = async (req, res) => {
         id: content._id,
         scheduledTime: content.scheduledTime,
         platform: content.scheduledPlatform,
+        platforms: getScheduledPlatforms(content),
+        profileId: content.scheduledProfileId || null,
         autoPost: content.autoPost,
         status: content.status
       }
@@ -453,12 +490,15 @@ exports.getScheduledPosts = async (req, res) => {
 
     const mappedPosts = scheduledPosts.map(post => ({
       id: post._id,
+      contentId: post._id,
       caption: post.caption,
       mediaUrl: post.mediaUrl,
       image: post.mediaUrl,
       scheduledTime: post.scheduledTime,
       scheduledAt: post.scheduledTime, // Alias for frontend compatibility
       platform: post.scheduledPlatform,
+      platforms: getScheduledPlatforms(post),
+      profileId: post.scheduledProfileId || null,
       autoPost: post.autoPost,
       status: post.status
     }));
@@ -480,7 +520,7 @@ exports.getScheduledPosts = async (req, res) => {
 exports.updateScheduledPost = async (req, res) => {
   try {
     const { scheduleId } = req.params;
-    const { scheduledTime, platform, autoPost } = req.body;
+    const { scheduledTime, platform, platforms, autoPost, profileId } = req.body;
 
     const content = await Content.findOne({
       _id: scheduleId,
@@ -495,8 +535,15 @@ exports.updateScheduledPost = async (req, res) => {
     if (scheduledTime) {
       content.scheduledTime = new Date(scheduledTime);
     }
-    if (platform) {
-      content.scheduledPlatform = platform;
+    if (platform !== undefined || platforms !== undefined) {
+      const resolvedPlatforms = normalizePlatforms(platforms || platform);
+      if (resolvedPlatforms.length === 0) {
+        return res.status(400).json({ error: 'At least one supported platform is required' });
+      }
+      setScheduledPlatforms(content, resolvedPlatforms);
+    }
+    if (profileId !== undefined) {
+      content.scheduledProfileId = profileId || undefined;
     }
     if (typeof autoPost === 'boolean') {
       content.autoPost = autoPost;
@@ -510,6 +557,8 @@ exports.updateScheduledPost = async (req, res) => {
         id: content._id,
         scheduledTime: content.scheduledTime,
         platform: content.scheduledPlatform,
+        platforms: getScheduledPlatforms(content),
+        profileId: content.scheduledProfileId || null,
         autoPost: content.autoPost
       }
     });
@@ -542,7 +591,8 @@ exports.cancelScheduledPost = async (req, res) => {
 
     content.status = 'draft';
     content.scheduledTime = undefined;
-    content.scheduledPlatform = undefined;
+    setScheduledPlatforms(content, []);
+    content.scheduledProfileId = undefined;
     content.autoPost = false;
 
     await content.save();

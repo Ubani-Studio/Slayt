@@ -33,7 +33,7 @@ function GalleryColorView({
       // Use metadata if available
       if (item.metadata?.dominantColors?.[0]) return false;
       // Need a URL to extract from
-      return item.mediaUrl || item.thumbnailUrl;
+      return item.thumbnailUrl || item.mediaUrl;
     });
 
     // First, collect items with existing metadata
@@ -59,7 +59,7 @@ function GalleryColorView({
       const batch = itemsToProcess.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
         batch.map(async (item) => {
-          const url = item.mediaUrl || item.thumbnailUrl;
+          const url = item.thumbnailUrl || item.mediaUrl;
           const color = await extractDominantColor(url);
           return { id: item._id, color };
         })
@@ -100,19 +100,19 @@ function GalleryColorView({
 
   const gridCols =
     viewMode === 'grid'
-      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4'
+      ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
       : 'space-y-2';
 
   return (
     <div>
       {/* Progress Indicator */}
       {extracting && (
-        <div className="flex items-center gap-3 mb-4 p-3 bg-dark-800 rounded-lg">
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-dark-700/60 bg-dark-900/45 p-3">
           <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
           <span className="text-sm text-dark-300">
             Extracting colors... {progress.done}/{progress.total}
           </span>
-          <div className="flex-1 h-1.5 bg-dark-700 rounded-full overflow-hidden">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-dark-700">
             <div
               className="h-full bg-zinc-400 rounded-full transition-all"
               style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}

@@ -4,6 +4,8 @@ const Grid = require('../models/Grid');
 const Collection = require('../models/Collection');
 const ReelCollection = require('../models/ReelCollection');
 
+const BACKEND_BASE_URL = `${process.env.API_URL || process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 3002}`}`.replace(/\/+$/, '');
+
 /**
  * Get all profiles for the authenticated user
  */
@@ -400,8 +402,8 @@ exports.connectInstagram = async (req, res) => {
 
     // Build Instagram OAuth URL
     const clientId = process.env.INSTAGRAM_CLIENT_ID;
-    const redirectUri = encodeURIComponent(process.env.INSTAGRAM_REDIRECT_URI || `${process.env.FRONTEND_URL}/api/auth/instagram/callback`);
-    const scope = encodeURIComponent('instagram_basic,instagram_content_publish,instagram_manage_comments,instagram_manage_insights');
+    const redirectUri = encodeURIComponent(process.env.INSTAGRAM_CONNECT_REDIRECT_URI || `${BACKEND_BASE_URL}/api/auth/instagram/connect/callback`);
+    const scope = encodeURIComponent('instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights');
 
     const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code&state=${state}`;
 
@@ -434,7 +436,7 @@ exports.connectTiktok = async (req, res) => {
 
     // Build TikTok OAuth URL
     const clientKey = process.env.TIKTOK_CLIENT_KEY;
-    const redirectUri = encodeURIComponent(process.env.TIKTOK_REDIRECT_URI || `${process.env.FRONTEND_URL}/api/auth/tiktok/callback`);
+    const redirectUri = encodeURIComponent(process.env.TIKTOK_REDIRECT_URI || `${BACKEND_BASE_URL}/api/auth/tiktok/callback`);
     const scope = encodeURIComponent('user.info.basic,video.upload,video.publish');
 
     const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code&state=${state}`;

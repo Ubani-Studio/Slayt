@@ -17,6 +17,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAppStore } from '../../stores/useAppStore';
 import { youtubeApi } from '../../lib/api';
 import { formatDuration, getPlannerVideoAssetState } from '../../lib/videoUtils';
+import { buildYoutubeUploadTitle } from '../../lib/youtubeUploadTitle';
+import { getYoutubeThumbnailWarning } from '../../lib/youtubeThumbnailWarnings';
 import {
   Upload,
   Youtube,
@@ -56,6 +58,15 @@ function SortableVideoItem({ video, displayIndex, isSelected, isLocked, isDropTa
     scheduled: 'Scheduled',
     published: 'Published',
   };
+  const displayTitle = buildYoutubeUploadTitle({
+    title: video.title,
+    artistName: video.artistName,
+    featuringArtists: video.featuringArtists,
+    fallbackTitle: 'Untitled Video',
+  });
+  const thumbnailWarning = video.status === 'published'
+    ? getYoutubeThumbnailWarning(video.lastError)
+    : null;
   const durationLabel = formatDuration(video.durationSeconds);
   const assetState = getPlannerVideoAssetState(video);
   const queueNumber = Number.isFinite(displayIndex) ? displayIndex + 1 : (video.position ?? 0) + 1;
@@ -120,7 +131,7 @@ function SortableVideoItem({ video, displayIndex, isSelected, isLocked, isDropTa
           )}
         </div>
         <h4 className="text-sm font-medium text-dark-100 truncate">
-          {video.artistName ? `${video.artistName} - ${video.title}` : video.title || 'Untitled Video'}
+          {displayTitle}
         </h4>
         <div className="flex items-center gap-2 mt-1">
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[video.status] || statusColors.draft}`}>
@@ -144,6 +155,14 @@ function SortableVideoItem({ video, displayIndex, isSelected, isLocked, isDropTa
           {video.thumbnailStatus === 'needs_custom' && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-400">
               Needs custom thumb
+            </span>
+          )}
+          {thumbnailWarning && (
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-300"
+              title={thumbnailWarning.summary}
+            >
+              No custom thumb
             </span>
           )}
           {video.scheduledDate && (
@@ -190,6 +209,12 @@ function YouTubeSidebarView({ isLocked, onUpload }) {
   const [overItemId, setOverItemId] = useState(null);
 
   const activeDragVideo = youtubeVideos.find((v) => v.id === activeDragId);
+  const activeDragTitle = buildYoutubeUploadTitle({
+    title: activeDragVideo?.title,
+    artistName: activeDragVideo?.artistName,
+    featuringArtists: activeDragVideo?.featuringArtists,
+    fallbackTitle: 'Untitled Video',
+  });
 
   const handleDragStart = useCallback((event) => {
     setActiveDragId(event.active.id);
@@ -353,7 +378,7 @@ function YouTubeSidebarView({ isLocked, onUpload }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-dark-100 truncate">
-                    {activeDragVideo.artistName ? `${activeDragVideo.artistName} - ${activeDragVideo.title}` : activeDragVideo.title || 'Untitled Video'}
+                    {activeDragTitle}
                   </h4>
                 </div>
               </div>

@@ -91,6 +91,11 @@ const youtubeVideoSchema = new mongoose.Schema({
     enum: ['private', 'unlisted', 'public'],
     default: 'public'
   },
+  endScreenTemplate: {
+    type: String,
+    enum: ['video_subscribe', 'playlist_subscribe', 'series_push', 'none'],
+    default: 'video_subscribe'
+  },
   scheduledDate: {
     type: Date
   },
@@ -119,6 +124,10 @@ const youtubeVideoSchema = new mongoose.Schema({
     trim: true,
     default: ''
   },
+  featuringArtists: [{
+    type: String,
+    trim: true
+  }],
   position: {
     type: Number,
     default: 0

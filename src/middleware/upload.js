@@ -35,7 +35,17 @@ const storage = useCloudStorage()
 // File filter
 const fileFilter = (req, file, cb) => {
   // Allowed file types
-  const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  const allowedImageTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/heic',
+    'image/heif',
+    'image/heic-sequence',
+    'image/heif-sequence',
+  ];
   const allowedVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
   const allowedLutTypes = ['application/octet-stream', 'text/plain', 'application/x-cube'];
   const allowedScheduleTypes = ['text/csv', 'text/calendar', 'application/json'];

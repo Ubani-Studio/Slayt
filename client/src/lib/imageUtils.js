@@ -9,6 +9,22 @@
  * @param {number} quality - JPEG quality 0-1 (default 0.95)
  * @returns {Promise<string>} Compressed base64 data URL
  */
+function canvasToDataUrl(canvas, quality = 0.95) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Failed to encode image'));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Failed to read encoded image'));
+      reader.readAsDataURL(blob);
+    }, 'image/jpeg', quality);
+  });
+}
+
 export async function compressImageFile(file, canvasWidth = 1920, canvasHeight = 1080, quality = 0.95) {
   const bitmap = await createImageBitmap(file);
 
@@ -32,7 +48,10 @@ export async function compressImageFile(file, canvasWidth = 1920, canvasHeight =
   ctx.drawImage(bitmap, x, y, w, h);
   bitmap.close();
 
-  return canvas.toDataURL('image/jpeg', quality);
+  const dataUrl = await canvasToDataUrl(canvas, quality);
+  canvas.width = 0;
+  canvas.height = 0;
+  return dataUrl;
 }
 
 /**
@@ -75,7 +94,13 @@ export function compressImage(dataUrl, canvasWidth = 1920, canvasHeight = 1080, 
 
       ctx.drawImage(img, x, y, w, h);
 
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      canvasToDataUrl(canvas, quality)
+        .then((dataUrl) => {
+          canvas.width = 0;
+          canvas.height = 0;
+          resolve(dataUrl);
+        })
+        .catch(reject);
     };
     img.onerror = () => {
       clearTimeout(timeout);

@@ -13,6 +13,19 @@ import {
   toDateInputValue,
   toTimeInputValue,
 } from '../../lib/youtubeSchedule';
+import { getYoutubeUploadTitleInfo } from '../../lib/youtubeUploadTitle';
+import { getYoutubeThumbnailWarning } from '../../lib/youtubeThumbnailWarnings';
+import {
+  DEFAULT_YOUTUBE_DESCRIPTION_TEMPLATE,
+  YOUTUBE_DESCRIPTION_TEMPLATE_PLACEHOLDERS,
+  getCollectionDescriptionTemplate,
+  renderYoutubeDescriptionTemplate,
+} from '../../lib/youtubeDescriptionTemplate';
+import {
+  END_SCREEN_TEMPLATE_OPTIONS,
+  YOUTUBE_END_SCREENS_HELP_URL,
+  getYoutubeStudioVideoEditUrl,
+} from '../../lib/youtubeStudio';
 import {
   Image,
   Type,
@@ -33,6 +46,7 @@ import {
   ThumbsDown,
   SkipForward,
   X,
+  ExternalLink,
 } from 'lucide-react';
 
 const STATUS_OPTIONS = [
@@ -46,10 +60,8 @@ const VISIBILITY_OPTIONS = [
   { value: 'unlisted', label: 'Unlisted' },
   { value: 'private', label: 'Private' },
 ];
-
-// YouTube title character limits
 const TITLE_MAX = 100;
-const TITLE_VISIBLE = 60; // Characters visible in search results
+const TITLE_VISIBLE = 60;
 
 const buildVideoPersistencePayload = (video = {}) => ({
   storageProvider: video.storageProvider || (video.muxAssetId || video.muxUploadId ? 'mux' : 'legacy'),
@@ -122,10 +134,22 @@ const formatEta = (seconds) => {
   return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
 };
 
+const normalizeNameList = (values = []) =>
+  [...new Set(
+    (Array.isArray(values) ? values : [values])
+      .flatMap((value) => String(value || '').split(','))
+      .map((value) => value.trim())
+      .filter(Boolean)
+  )].slice(0, 12);
+
+const nameListsEqual = (a = [], b = []) =>
+  JSON.stringify(normalizeNameList(a)) === JSON.stringify(normalizeNameList(b));
+
 function YouTubeVideoDetails({
   video,
   onThumbnailUpload,
   videoClipboard,
+  currentCollection,
   currentCollectionName,
   onCopyVideo,
   onCutVideo,
@@ -133,6 +157,7 @@ function YouTubeVideoDetails({
 }) {
   const updateYoutubeVideo = useAppStore((state) => state.updateYoutubeVideo);
   const deleteYoutubeVideo = useAppStore((state) => state.deleteYoutubeVideo);
+  const updateYoutubeCollection = useAppStore((state) => state.updateYoutubeCollection);
   const currentProfileId = useAppStore((state) => state.currentProfileId);
   const activeFolioId = useAppStore((state) => state.activeFolioId);
   const activeProjectId = useAppStore((state) => state.activeProjectId);
@@ -147,10 +172,15 @@ function YouTubeVideoDetails({
   const [title, setTitle] = useState(video?.title || '');
   const [description, setDescription] = useState(video?.description || '');
   const [artistName, setArtistName] = useState(video?.artistName || '');
+  const [featuringArtists, setFeaturingArtists] = useState(() => normalizeNameList(video?.featuringArtists || []));
+  const [featuringInput, setFeaturingInput] = useState('');
   const [showArtistSuggestions, setShowArtistSuggestions] = useState(false);
+  const [showFeaturingSuggestions, setShowFeaturingSuggestions] = useState(false);
   const artistInputRef = useRef(null);
+  const featuringInputRef = useRef(null);
   const [status, setStatus] = useState(video?.status || 'draft');
   const [privacyStatus, setPrivacyStatus] = useState(video?.privacyStatus || 'public');
+  const [endScreenTemplate, setEndScreenTemplate] = useState(video?.endScreenTemplate || 'video_subscribe');
   const [scheduledDate, setScheduledDate] = useState(toDateInputValue(video?.scheduledDate));
   const [scheduledTime, setScheduledTime] = useState(toTimeInputValue(video?.scheduledDate));
   const [showTruncatePreview, setShowTruncatePreview] = useState(false);
@@ -158,11 +188,14 @@ function YouTubeVideoDetails({
   const [showYoutubePreview, setShowYoutubePreview] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const previewVideoRef = useRef(null);
+  const [activePanelTab, setActivePanelTab] = useState('details');
   const [showVideoFile, setShowVideoFile] = useState(true);
   const [showSchedulePopover, setShowSchedulePopover] = useState(false);
   const [isDraggingVideoFile, setIsDraggingVideoFile] = useState(false);
   const [videoUploadProgress, setVideoUploadProgress] = useState(null);
   const [showDescription, setShowDescription] = useState(true);
+  const [showDescriptionTemplateEditor, setShowDescriptionTemplateEditor] = useState(false);
+  const [collectionDescriptionTemplate, setCollectionDescriptionTemplate] = useState(() => getCollectionDescriptionTemplate(currentCollection));
 
   // AI Generation state
   const [showAIPanel, setShowAIPanel] = useState(false);
@@ -180,6 +213,8 @@ function YouTubeVideoDetails({
   const lastSavedRef = useRef({
     title: video?.title || '',
     description: video?.description || '',
+    artistName: video?.artistName || '',
+    featuringArtists: normalizeNameList(video?.featuringArtists || []),
   });
 
   // Update local state when video changes
@@ -188,8 +223,13 @@ function YouTubeVideoDetails({
       setTitle(video.title || '');
       setDescription(video.description || '');
       setArtistName(video.artistName || '');
+      setFeaturingArtists(normalizeNameList(video.featuringArtists || []));
+      setFeaturingInput('');
+      setShowFeaturingSuggestions(false);
       setStatus(video.status || 'draft');
       setPrivacyStatus(video.privacyStatus || 'public');
+      setEndScreenTemplate(video.endScreenTemplate || 'video_subscribe');
+      setActivePanelTab('details');
       setScheduledDate(toDateInputValue(video.scheduledDate));
       setScheduledTime(toTimeInputValue(video.scheduledDate));
       setIsDraggingVideoFile(false);
@@ -200,12 +240,17 @@ function YouTubeVideoDetails({
         title: video.title || '',
         description: video.description || '',
         artistName: video.artistName || '',
+        featuringArtists: normalizeNameList(video.featuringArtists || []),
       };
       if (autosaveTimer.current) {
         clearTimeout(autosaveTimer.current);
       }
     }
   }, [video?.id]);
+
+  useEffect(() => {
+    setCollectionDescriptionTemplate(getCollectionDescriptionTemplate(currentCollection));
+  }, [currentCollection?.id, currentCollection?._id, currentCollection?.descriptionTemplate]);
 
   useEffect(() => {
     if (!videoId || videoUploadProgress?.phase !== 'processing') {
@@ -281,10 +326,11 @@ function YouTubeVideoDetails({
       const dirtyTitle = title !== lastSavedRef.current.title;
       const dirtyDescription = description !== lastSavedRef.current.description;
       const dirtyArtist = artistName !== lastSavedRef.current.artistName;
+      const dirtyFeaturing = !nameListsEqual(featuringArtists, lastSavedRef.current.featuringArtists);
       // Only save if title is not empty (required field) and something changed
-      if ((dirtyTitle || dirtyDescription || dirtyArtist) && title.trim()) {
-        persistVideoUpdates({ title, description, artistName });
-        lastSavedRef.current = { title, description, artistName };
+      if ((dirtyTitle || dirtyDescription || dirtyArtist || dirtyFeaturing) && title.trim()) {
+        persistVideoUpdates({ title, description, artistName, featuringArtists });
+        lastSavedRef.current = { title, description, artistName, featuringArtists };
       }
     }, 700);
 
@@ -293,7 +339,7 @@ function YouTubeVideoDetails({
         clearTimeout(autosaveTimer.current);
       }
     };
-  }, [title, description, artistName, video?.id]);
+  }, [title, description, artistName, featuringArtists, video?.id]);
 
   // Load taste profile for richer prompts
   useEffect(() => {
@@ -314,13 +360,14 @@ function YouTubeVideoDetails({
       const dirtyTitle = title !== lastSavedRef.current.title;
       const dirtyDescription = description !== lastSavedRef.current.description;
       const dirtyArtist = artistName !== lastSavedRef.current.artistName;
+      const dirtyFeaturing = !nameListsEqual(featuringArtists, lastSavedRef.current.featuringArtists);
       // Only save if title is not empty and something changed
-      if ((dirtyTitle || dirtyDescription || dirtyArtist) && title.trim()) {
-        persistVideoUpdates({ title, description, artistName });
-        lastSavedRef.current = { title, description, artistName };
+      if ((dirtyTitle || dirtyDescription || dirtyArtist || dirtyFeaturing) && title.trim()) {
+        persistVideoUpdates({ title, description, artistName, featuringArtists });
+        lastSavedRef.current = { title, description, artistName, featuringArtists };
       }
     }
-  }, [videoId, title, description, artistName]);
+  }, [videoId, title, description, artistName, featuringArtists]);
 
   if (!video) {
     return (
@@ -365,10 +412,19 @@ function YouTubeVideoDetails({
       const { video: savedVideo } = await youtubeApi.updateVideo(videoId, updates);
       if (savedVideo) {
         updateYoutubeVideo(videoId, { ...savedVideo, id: savedVideo._id || videoId });
-        if (typeof updates.title === 'string' || typeof updates.description === 'string') {
+        if (
+          typeof updates.title === 'string'
+          || typeof updates.description === 'string'
+          || typeof updates.artistName === 'string'
+          || updates.featuringArtists !== undefined
+        ) {
           lastSavedRef.current = {
             title: updates.title ?? lastSavedRef.current.title,
             description: updates.description ?? lastSavedRef.current.description,
+            artistName: updates.artistName ?? lastSavedRef.current.artistName,
+            featuringArtists: updates.featuringArtists !== undefined
+              ? normalizeNameList(updates.featuringArtists)
+              : lastSavedRef.current.featuringArtists,
           };
         }
         return savedVideo;
@@ -399,6 +455,78 @@ function YouTubeVideoDetails({
     lastSavedRef.current = { ...lastSavedRef.current, description };
   };
 
+  const persistCollectionDescriptionTemplate = async (nextTemplate) => {
+    const collectionId = currentCollection?._id || currentCollection?.id;
+    if (!collectionId) {
+      return;
+    }
+
+    const normalizedTemplate = String(nextTemplate || '').trim() || DEFAULT_YOUTUBE_DESCRIPTION_TEMPLATE;
+    setCollectionDescriptionTemplate(normalizedTemplate);
+    updateYoutubeCollection(collectionId, { descriptionTemplate: normalizedTemplate });
+
+    try {
+      await youtubeApi.updateCollection(collectionId, { descriptionTemplate: normalizedTemplate });
+    } catch (error) {
+      console.error('Failed to save YouTube description template:', error);
+    }
+  };
+
+  const applyCollectionDescriptionTemplate = async () => {
+    const nextDescription = renderYoutubeDescriptionTemplate({
+      template: collectionDescriptionTemplate,
+      title,
+      artistName,
+      featuringArtists,
+      collectionName: currentCollectionName || currentCollection?.name || '',
+    });
+
+    setDescription(nextDescription);
+    await persistVideoUpdates({ description: nextDescription });
+    lastSavedRef.current = { ...lastSavedRef.current, description: nextDescription };
+  };
+
+  const commitFeaturingInput = (rawValue = featuringInput) => {
+    const nextValue = String(rawValue || '').trim();
+    if (!nextValue) {
+      setFeaturingInput('');
+      return;
+    }
+
+    const nextFeaturingArtists = normalizeNameList([...featuringArtists, nextValue]);
+    setFeaturingArtists(nextFeaturingArtists);
+    setFeaturingInput('');
+    setShowFeaturingSuggestions(false);
+    if (videoId) {
+      updateYoutubeVideo(videoId, { featuringArtists: nextFeaturingArtists });
+    }
+    persistVideoUpdates({ featuringArtists: nextFeaturingArtists });
+    lastSavedRef.current = { ...lastSavedRef.current, featuringArtists: nextFeaturingArtists };
+  };
+
+  const handleRemoveFeaturingArtist = (nameToRemove) => {
+    const nextFeaturingArtists = featuringArtists.filter((name) => name !== nameToRemove);
+    setFeaturingArtists(nextFeaturingArtists);
+    if (videoId) {
+      updateYoutubeVideo(videoId, { featuringArtists: nextFeaturingArtists });
+    }
+    persistVideoUpdates({ featuringArtists: nextFeaturingArtists });
+    lastSavedRef.current = { ...lastSavedRef.current, featuringArtists: nextFeaturingArtists };
+  };
+
+  const handleFeaturingKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
+      commitFeaturingInput();
+      return;
+    }
+
+    if (event.key === 'Backspace' && !featuringInput && featuringArtists.length > 0) {
+      event.preventDefault();
+      handleRemoveFeaturingArtist(featuringArtists[featuringArtists.length - 1]);
+    }
+  };
+
   // Taste feedback signals — removed (genome stripped)
   const sendTasteSignal = async () => {};
 
@@ -423,6 +551,11 @@ function YouTubeVideoDetails({
   const handleVisibilityChange = (nextVisibility) => {
     setPrivacyStatus(nextVisibility);
     persistVideoUpdates({ privacyStatus: nextVisibility });
+  };
+
+  const handleEndScreenTemplateChange = (nextTemplate) => {
+    setEndScreenTemplate(nextTemplate);
+    persistVideoUpdates({ endScreenTemplate: nextTemplate });
   };
 
   const handleScheduleApply = ({ scheduledDate: nextDate, scheduledTime: nextTime }) => {
@@ -780,13 +913,47 @@ function YouTubeVideoDetails({
     }
   };
 
-  const titleLength = title.length;
+  const {
+    rawTitle: finalUploadTitleRaw,
+    uploadTitle: finalUploadTitle,
+    wasTruncated: finalUploadTitleTrimmed,
+  } = getYoutubeUploadTitleInfo({
+    artistName,
+    featuringArtists,
+    title,
+    fallbackTitle: 'Untitled Video',
+    maxLength: TITLE_MAX,
+  });
+  const titleLength = finalUploadTitleRaw.length;
   const isTitleLong = titleLength > TITLE_VISIBLE;
-  const truncatedTitle = isTitleLong ? title.slice(0, TITLE_VISIBLE) + '...' : title;
+  const truncatedTitle = isTitleLong ? `${finalUploadTitleRaw.slice(0, TITLE_VISIBLE)}...` : finalUploadTitleRaw;
   const scheduledSummary = scheduledDate
     ? formatScheduleSummary(new Date(`${scheduledDate}T${scheduledTime || '12:00'}`))
     : null;
   const visibilityLabel = VISIBILITY_OPTIONS.find((option) => option.value === privacyStatus)?.label || 'Public';
+  const publishedWarning = video.status === 'published' && video.lastError ? video.lastError : '';
+  const failedMessage = video.status === 'failed' && video.lastError ? video.lastError : '';
+  const thumbnailWarning = getYoutubeThumbnailWarning(publishedWarning);
+  const selectedEndScreenTemplate = END_SCREEN_TEMPLATE_OPTIONS.find((option) => option.value === endScreenTemplate)
+    || END_SCREEN_TEMPLATE_OPTIONS[0];
+  const youtubeStudioUrl = getYoutubeStudioVideoEditUrl(video.youtubeVideoId);
+  const featuringSummary = featuringArtists.length > 0 ? `Featuring ${featuringArtists.join(', ')}` : '';
+  const descriptionTemplateSummary = (collectionDescriptionTemplate || DEFAULT_YOUTUBE_DESCRIPTION_TEMPLATE)
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean) || 'No template yet';
+  const featuringSuggestions = normalizeNameList([
+    ...youtubeVideos.flatMap((plannerVideo) => plannerVideo.featuringArtists || []),
+    ...youtubeVideos.map((plannerVideo) => plannerVideo.artistName).filter(Boolean),
+  ]).filter((name) => {
+    if (featuringArtists.includes(name)) {
+      return false;
+    }
+    if (!featuringInput.trim()) {
+      return true;
+    }
+    return name.toLowerCase().includes(featuringInput.trim().toLowerCase());
+  }).slice(0, 8);
 
   return (
     <div className="h-full bg-dark-800 rounded-2xl border border-dark-700 flex flex-col overflow-hidden">
@@ -878,78 +1045,201 @@ function YouTubeVideoDetails({
                   ? 'Video-frame thumbnail'
                   : 'Thumbnail missing'}
           </span>
+          {thumbnailWarning && (
+            <span className="rounded-full bg-amber-500/15 px-2 py-1 text-amber-300">
+              {thumbnailWarning.badgeLabel}
+            </span>
+          )}
         </div>
 
-        <div className="relative rounded-2xl border border-dark-700 bg-dark-900/30 p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs uppercase tracking-[0.16em] text-dark-500">Release</p>
-              <p className="mt-1 text-sm font-medium text-dark-100">
-                {scheduledSummary || 'Not scheduled'}
-              </p>
-              <p className="mt-1 text-xs text-dark-300">
-                Visibility: <span className="text-dark-100">{visibilityLabel}</span>
-              </p>
-              <p className="mt-1 text-xs text-dark-400">
-                {scheduledSummary
-                  ? `This is when Slayt will send the upload as ${visibilityLabel.toLowerCase()}.`
-                  : hasVideoAsset
-                    ? `Pick a day and time for this ${visibilityLabel.toLowerCase()} upload.`
-                    : 'Attach a video to unlock scheduling.'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {scheduledSummary && (
-                <button
-                  type="button"
-                  onClick={handleScheduleClear}
-                  className="rounded-lg px-3 py-2 text-xs text-dark-300 transition-colors hover:bg-dark-700 hover:text-dark-100"
-                >
-                  Clear
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowSchedulePopover((current) => !current)}
-                className="rounded-lg bg-dark-100 px-3 py-2 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
+        {thumbnailWarning ? (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3">
+            <p className="text-xs font-medium text-amber-300">{thumbnailWarning.badgeLabel}</p>
+            <p className="mt-1 text-xs text-amber-100/90">{thumbnailWarning.summary}</p>
+            <p className="mt-2 text-xs text-amber-200/80">{thumbnailWarning.detail}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <a
+                href={thumbnailWarning.helpUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center rounded-lg bg-black/40 px-3 py-1.5 text-xs font-medium text-amber-100 transition-colors hover:bg-black/60"
               >
-                {scheduledSummary ? 'Reschedule' : 'Schedule'}
-              </button>
+                {thumbnailWarning.helpLabel}
+              </a>
+              <span className="text-[11px] text-amber-200/70">
+                Slayt can’t enable this automatically for the user.
+              </span>
             </div>
           </div>
-
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dark-700/60 bg-black/40 px-3 py-2">
-            <span className="text-xs font-medium text-dark-400">Visibility</span>
-            <select
-              value={privacyStatus}
-              onChange={(event) => handleVisibilityChange(event.target.value)}
-              className="min-w-[8.5rem] appearance-none rounded-lg border border-dark-700/70 bg-black px-2.5 py-1.5 text-sm text-dark-100 focus:outline-none focus:border-dark-500"
-              style={{ colorScheme: 'dark' }}
-              title="Choose how this video will appear on YouTube"
-            >
-              {VISIBILITY_OPTIONS.map((option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                  style={{ backgroundColor: '#000000', color: '#f5f5f5' }}
-                >
-                  {option.label}
-                </option>
-              ))}
-            </select>
+        ) : publishedWarning ? (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+            <p className="text-xs font-medium text-amber-300">Video uploaded with a warning</p>
+            <p className="mt-1 text-xs text-amber-200/90">{publishedWarning}</p>
           </div>
+        ) : null}
 
-          <YouTubeSchedulePopover
-            isOpen={showSchedulePopover}
-            scheduledDate={scheduledDate}
-            scheduledTime={scheduledTime}
-            canSchedule={hasVideoAsset}
-            onApply={handleScheduleApply}
-            onClear={handleScheduleClear}
-            onClose={() => setShowSchedulePopover(false)}
-          />
+        {failedMessage && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2">
+            <p className="text-xs font-medium text-red-200">Upload failed</p>
+            <p className="mt-1 text-xs text-red-200/90">{failedMessage}</p>
+          </div>
+        )}
+
+        <div className="inline-flex rounded-xl border border-dark-700 bg-dark-900/40 p-1">
+          {['details', 'publish'].map((tab) => {
+            const isActive = activePanelTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActivePanelTab(tab)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-dark-100 text-dark-900'
+                    : 'text-dark-400 hover:text-dark-100'
+                }`}
+              >
+                {tab === 'details' ? 'Details' : 'Publish'}
+              </button>
+            );
+          })}
         </div>
 
+        {activePanelTab === 'publish' && (
+          <>
+            <div className="relative rounded-2xl border border-dark-700 bg-dark-900/30 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-dark-400">Release</p>
+                  <p className="mt-1 text-sm font-medium text-dark-100">
+                    {scheduledSummary || 'Not scheduled'}
+                  </p>
+                  <p className="mt-1 text-xs text-dark-500">
+                    {hasVideoAsset
+                      ? `${visibilityLabel} visibility`
+                      : 'Attach a video to unlock scheduling'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {scheduledSummary && (
+                    <button
+                      type="button"
+                      onClick={handleScheduleClear}
+                      className="rounded-lg px-2.5 py-1.5 text-xs text-dark-300 transition-colors hover:bg-dark-700 hover:text-dark-100"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowSchedulePopover((current) => !current)}
+                    className="rounded-lg bg-dark-100 px-2.5 py-1.5 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
+                  >
+                    {scheduledSummary ? 'Edit' : 'Schedule'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2 rounded-xl border border-dark-700/60 bg-black/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-xs font-medium text-dark-400">Visibility</span>
+                <select
+                  value={privacyStatus}
+                  onChange={(event) => handleVisibilityChange(event.target.value)}
+                  className="w-full max-w-full appearance-none rounded-lg border border-dark-700/70 bg-black px-2.5 py-1.5 text-sm text-dark-100 focus:outline-none focus:border-dark-500 sm:w-[10rem] sm:flex-none"
+                  style={{ colorScheme: 'dark' }}
+                  title="Choose how this video will appear on YouTube"
+                >
+                  {VISIBILITY_OPTIONS.map((option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      style={{ backgroundColor: '#000000', color: '#f5f5f5' }}
+                    >
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <YouTubeSchedulePopover
+                isOpen={showSchedulePopover}
+                scheduledDate={scheduledDate}
+                scheduledTime={scheduledTime}
+                canSchedule={hasVideoAsset}
+                onApply={handleScheduleApply}
+                onClear={handleScheduleClear}
+                onClose={() => setShowSchedulePopover(false)}
+              />
+            </div>
+
+            <div className="rounded-2xl border border-dark-700 bg-dark-900/30 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-dark-400">End screen</p>
+                  <p className="mt-1 text-sm font-medium text-dark-100">
+                    {selectedEndScreenTemplate.label}
+                  </p>
+                  <p className="mt-1 text-xs text-dark-500">
+                    Apply this in YouTube Studio after publish.
+                  </p>
+                </div>
+                {youtubeStudioUrl && video.status === 'published' && (
+                  <a
+                    href={youtubeStudioUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-dark-100 px-2.5 py-1.5 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
+                    title="Open this video in YouTube Studio"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Studio</span>
+                  </a>
+                )}
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2 rounded-xl border border-dark-700/60 bg-black/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-xs font-medium text-dark-400">Recipe</span>
+                <select
+                  value={endScreenTemplate}
+                  onChange={(event) => handleEndScreenTemplateChange(event.target.value)}
+                  className="w-full max-w-full appearance-none rounded-lg border border-dark-700/70 bg-black px-2.5 py-1.5 text-sm text-dark-100 focus:outline-none focus:border-dark-500 sm:w-[13rem] sm:flex-none"
+                  style={{ colorScheme: 'dark' }}
+                  title="Choose which end-screen setup you plan to apply in YouTube Studio"
+                >
+                  {END_SCREEN_TEMPLATE_OPTIONS.map((option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      style={{ backgroundColor: '#000000', color: '#f5f5f5' }}
+                    >
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-dark-500">
+                <a
+                  href={YOUTUBE_END_SCREENS_HELP_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-dark-700 bg-black/30 px-3 py-1.5 text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-100"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Help</span>
+                </a>
+                <span>
+                  {youtubeStudioUrl && video.status === 'published'
+                    ? 'Ready for Studio.'
+                    : 'Available after publish.'}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {activePanelTab === 'details' && (
+          <>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
@@ -1202,11 +1492,89 @@ function YouTubeVideoDetails({
               </div>
             );
           })()}
-          {artistName && title && (
+          {(artistName || title) && (
             <p className="text-xs text-dark-400 mt-1 truncate">
-              Preview: <span className="text-dark-200">{artistName} - {title}</span>
+              Final upload title: <span className="text-dark-200">{finalUploadTitle}</span>
             </p>
           )}
+          {featuringSummary && (
+            <p className="text-xs text-dark-500 mt-1 truncate">
+              {featuringSummary}
+            </p>
+          )}
+        </div>
+
+        <div className="relative">
+          <label className="flex items-center gap-2 text-xs font-medium text-dark-400 mb-1.5">
+            Featuring
+          </label>
+          <div className="rounded-xl border border-dark-700 bg-dark-900/40 px-2 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {featuringArtists.map((name) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1 rounded-full border border-dark-600 bg-dark-800 px-2.5 py-1 text-xs text-dark-200"
+                >
+                  <span>{name}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFeaturingArtist(name)}
+                    className="text-dark-400 transition-colors hover:text-dark-100"
+                    title={`Remove ${name}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              ))}
+              <input
+                ref={featuringInputRef}
+                type="text"
+                value={featuringInput}
+                onChange={(event) => {
+                  setFeaturingInput(event.target.value);
+                  setShowFeaturingSuggestions(true);
+                }}
+                onFocus={() => setShowFeaturingSuggestions(true)}
+                onBlur={() => {
+                  setTimeout(() => {
+                    commitFeaturingInput(featuringInputRef.current?.value || '');
+                    setShowFeaturingSuggestions(false);
+                  }, 120);
+                }}
+                onKeyDown={handleFeaturingKeyDown}
+                placeholder={featuringArtists.length > 0 ? 'Add another name' : 'Add collaborator names'}
+                className="min-w-[10rem] flex-1 bg-transparent py-1 text-sm text-dark-100 outline-none placeholder:text-dark-500"
+              />
+            </div>
+          </div>
+          {showFeaturingSuggestions && featuringSuggestions.length > 0 && (
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-dark-800 border border-dark-600 rounded-lg shadow-xl overflow-hidden max-h-36 overflow-y-auto">
+              {featuringSuggestions.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    const nextFeaturingArtists = normalizeNameList([...featuringArtists, name]);
+                    setFeaturingArtists(nextFeaturingArtists);
+                    setFeaturingInput('');
+                    setShowFeaturingSuggestions(false);
+                    if (videoId) {
+                      updateYoutubeVideo(videoId, { featuringArtists: nextFeaturingArtists });
+                    }
+                    persistVideoUpdates({ featuringArtists: nextFeaturingArtists });
+                    lastSavedRef.current = { ...lastSavedRef.current, featuringArtists: nextFeaturingArtists };
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-dark-200 hover:bg-dark-700 transition-colors truncate"
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="mt-1 text-xs text-dark-500">
+            Press Enter or comma to add names. This stays in Slayt metadata for planning and credits.
+          </p>
         </div>
 
         {/* Title */}
@@ -1241,15 +1609,20 @@ function YouTubeVideoDetails({
           {/* Character Count */}
           <div className="flex items-center justify-between mt-1.5">
             <div className="flex items-center gap-2">
-              <span className={`text-xs ${titleLength > TITLE_VISIBLE ? 'text-amber-400' : 'text-dark-500'}`}>
+              <span className={`text-xs ${(titleLength > TITLE_VISIBLE || finalUploadTitleTrimmed) ? 'text-amber-400' : 'text-dark-500'}`}>
                 {titleLength}/{TITLE_MAX}
               </span>
-              {isTitleLong && (
+              {finalUploadTitleTrimmed ? (
+                <span className="text-xs text-amber-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  Final upload title will be trimmed to fit YouTube
+                </span>
+              ) : isTitleLong ? (
                 <span className="text-xs text-amber-400 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
                   Title will be truncated in search
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -1264,24 +1637,75 @@ function YouTubeVideoDetails({
 
         {/* Description */}
         <div>
-          <button
-            onClick={() => setShowDescription(!showDescription)}
-            className="w-full flex items-center justify-between mb-2 hover:opacity-80 transition-opacity"
-          >
-            <label className="flex items-center gap-2 text-sm font-medium text-dark-200 cursor-pointer">
-              <FileText className="w-4 h-4" />
-              Description
-            </label>
-            <ChevronDown className={`w-4 h-4 text-dark-400 transition-transform ${showDescription ? 'rotate-180' : ''}`} />
-          </button>
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <button
+              onClick={() => setShowDescription(!showDescription)}
+              className="min-w-0 flex flex-1 items-center justify-between hover:opacity-80 transition-opacity"
+            >
+              <label className="flex items-center gap-2 text-sm font-medium text-dark-200 cursor-pointer">
+                <FileText className="w-4 h-4" />
+                Description
+              </label>
+              <ChevronDown className={`w-4 h-4 text-dark-400 transition-transform ${showDescription ? 'rotate-180' : ''}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => applyCollectionDescriptionTemplate()}
+              className="shrink-0 rounded-lg border border-dark-600 bg-dark-700 px-3 py-1.5 text-xs font-medium text-dark-200 transition-colors hover:bg-dark-600 hover:text-dark-100"
+            >
+              {description.trim() ? 'Regenerate from template' : 'Apply template'}
+            </button>
+          </div>
           {showDescription && (
-            <textarea
-              value={description}
-              onChange={(e) => handleDescriptionChange(e.target.value)}
-              onBlur={handleDescriptionBlur}
-              placeholder="Add a description (optional)..."
-              className="input w-full min-h-[200px] resize-y"
-            />
+            <div className="space-y-3">
+              <div className="rounded-xl border border-dark-700/70 bg-dark-900/40 px-3 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-dark-300">Collection template</p>
+                    <p className="mt-1 text-xs text-dark-500">
+                      {descriptionTemplateSummary}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDescriptionTemplateEditor((current) => !current)}
+                    className="shrink-0 rounded-lg border border-dark-700 bg-black/30 px-3 py-1.5 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
+                  >
+                    {showDescriptionTemplateEditor ? 'Hide template' : 'Edit template'}
+                  </button>
+                </div>
+
+                {showDescriptionTemplateEditor && (
+                  <div className="mt-3 space-y-3">
+                    <textarea
+                      value={collectionDescriptionTemplate}
+                      onChange={(event) => setCollectionDescriptionTemplate(event.target.value)}
+                      onBlur={(event) => persistCollectionDescriptionTemplate(event.target.value)}
+                      placeholder="Set the default YouTube description template for this collection..."
+                      className="input w-full min-h-[160px] resize-y text-sm"
+                    />
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-dark-500">
+                      {YOUTUBE_DESCRIPTION_TEMPLATE_PLACEHOLDERS.map((placeholder) => (
+                        <span
+                          key={placeholder}
+                          className="rounded-full border border-dark-700 bg-black/30 px-2 py-1 text-dark-400"
+                        >
+                          {placeholder}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <textarea
+                value={description}
+                onChange={(e) => handleDescriptionChange(e.target.value)}
+                onBlur={handleDescriptionBlur}
+                placeholder="Add a description (optional)..."
+                className="input w-full min-h-[200px] resize-y"
+              />
+            </div>
           )}
         </div>
 
@@ -1309,6 +1733,8 @@ function YouTubeVideoDetails({
             Skip
           </button>
         </div>
+          </>
+        )}
 
         {/* AI Generation */}
         <div className="border-t border-dark-700 pt-4">
@@ -1489,8 +1915,13 @@ function YouTubeVideoDetails({
             {/* Video Info */}
             <div className="px-4 pt-3 pb-4">
               <h1 className="text-xl font-semibold text-white leading-snug mb-3">
-                {artistName ? `${artistName} - ${title}` : title || 'Untitled Video'}
+                {finalUploadTitle}
               </h1>
+              {featuringSummary && (
+                <p className="mb-3 text-sm text-[#aaaaaa]">
+                  {featuringSummary}
+                </p>
+              )}
 
               {/* Channel Row */}
               <div className="flex items-center gap-3 mb-4">

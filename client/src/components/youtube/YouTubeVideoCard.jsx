@@ -2,6 +2,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Trash2, GripVertical, Image } from 'lucide-react';
 import { formatDuration, getPlannerVideoAssetState } from '../../lib/videoUtils';
+import { buildYoutubeUploadTitle } from '../../lib/youtubeUploadTitle';
+import { getYoutubeThumbnailWarning } from '../../lib/youtubeThumbnailWarnings';
 
 const STATUS_COLORS = {
   draft: 'bg-gray-500',
@@ -34,10 +36,19 @@ function YouTubeVideoCard({ video, displayIndex, isSelected, isLocked, isDropTar
   };
 
   // YouTube title limits: 100 chars max, ~60 visible in search
-  const titleLength = video.title?.length || 0;
+  const displayTitle = buildYoutubeUploadTitle({
+    title: video.title,
+    artistName: video.artistName,
+    featuringArtists: video.featuringArtists,
+    fallbackTitle: 'Untitled Video',
+  });
+  const titleLength = displayTitle.length;
   const isTitleTruncated = titleLength > 60;
   const durationLabel = formatDuration(video.durationSeconds);
   const assetState = getPlannerVideoAssetState(video);
+  const thumbnailWarning = video.status === 'published'
+    ? getYoutubeThumbnailWarning(video.lastError)
+    : null;
   const queueNumber = Number.isFinite(displayIndex) ? displayIndex + 1 : (video.position ?? 0) + 1;
   const isFirstInQueue = queueNumber === 1;
 
@@ -117,10 +128,10 @@ function YouTubeVideoCard({ video, displayIndex, isSelected, isLocked, isDropTar
         </div>
       </div>
 
-      {/* Title Section */}
+        {/* Title Section */}
       <div className="p-3">
         <h3 className="text-sm font-medium text-dark-100 line-clamp-2 min-h-[2.5rem]">
-          {video.artistName ? `${video.artistName} - ${video.title}` : video.title || 'Untitled Video'}
+          {displayTitle}
         </h3>
 
         {/* Character count indicator */}
@@ -146,6 +157,14 @@ function YouTubeVideoCard({ video, displayIndex, isSelected, isLocked, isDropTar
           {video.thumbnailStatus === 'needs_custom' && (
             <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-400">
               Needs custom thumb
+            </span>
+          )}
+          {thumbnailWarning && (
+            <span
+              className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-300"
+              title={thumbnailWarning.summary}
+            >
+              No custom thumb
             </span>
           )}
         </div>

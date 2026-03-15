@@ -124,6 +124,15 @@ const userSchema = new mongoose.Schema({
     defaultGridSize: { type: Number, default: 3 },
     theme: { type: String, default: 'light' }
   },
+  clarosa: {
+    connected: { type: Boolean, default: false },
+    baseUrl: { type: String, default: 'http://127.0.0.1:8000' },
+    workspaceId: { type: String, default: 'default' },
+    autoSyncOnUpload: { type: Boolean, default: true },
+    lastIndexedAt: Date,
+    lastIndexedSummary: mongoose.Schema.Types.Mixed,
+    lastError: String
+  },
   brandKit: {
     colors: {
       primary: { type: String, default: '#000000' },

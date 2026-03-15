@@ -979,7 +979,7 @@ function Calendar() {
                       Platforms
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {['instagram', 'tiktok', 'youtube', 'twitter', 'facebook'].map((platform) => (
+                      {['instagram', 'tiktok', 'youtube'].map((platform) => (
                         <button
                           key={platform}
                           onClick={() => togglePlatform(platform)}
@@ -1122,7 +1122,7 @@ function Calendar() {
                       Platforms
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {['instagram', 'tiktok', 'youtube', 'twitter', 'facebook'].map((platform) => (
+                      {['instagram', 'tiktok', 'youtube'].map((platform) => (
                         <button
                           key={platform}
                           onClick={() => togglePlatform(platform)}

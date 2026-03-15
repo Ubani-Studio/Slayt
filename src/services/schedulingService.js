@@ -160,6 +160,8 @@ class SchedulingService {
       const result = await youtubeApiService.uploadVideo(user, {
         videoUrl,
         title: video.title || 'Untitled Video',
+        artistName: video.artistName || '',
+        featuringArtists: video.featuringArtists || [],
         description: video.description || '',
         tags: video.tags || [],
         privacyStatus: video.privacyStatus || 'public',
@@ -170,11 +172,15 @@ class SchedulingService {
         throw new Error(result.error || 'YouTube upload failed');
       }
 
+      const thumbnailWarning = result.thumbnailError
+        ? `Custom thumbnail was not applied: ${result.thumbnailError}`
+        : '';
+
       video.status = 'published';
       video.youtubeVideoId = result.videoId || '';
       video.youtubeVideoUrl = result.videoUrl || '';
       video.publishedAt = new Date();
-      video.lastError = undefined;
+      video.lastError = thumbnailWarning || undefined;
       video.scheduledDate = undefined;
       await video.save();
     } catch (error) {

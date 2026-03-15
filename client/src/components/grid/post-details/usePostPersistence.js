@@ -5,9 +5,11 @@ import { contentApi } from '../../../lib/api';
 export function usePostPersistence(post) {
   const updatePost = useAppStore((state) => state.updatePost);
   const postId = post?.id || post?._id || null;
+  const initialCaption = post?.caption || '';
+  const initialHashtags = Array.isArray(post?.hashtags) ? post.hashtags.join(' ') : '';
 
-  const [caption, setCaption] = useState(post?.caption || '');
-  const [hashtags, setHashtags] = useState(post?.hashtags?.join(' ') || '');
+  const [caption, setCaption] = useState(initialCaption);
+  const [hashtags, setHashtags] = useState(initialHashtags);
 
   const captionDraftRef = useRef(caption);
   const hashtagsDraftRef = useRef(hashtags);
@@ -56,9 +58,9 @@ export function usePostPersistence(post) {
     }
 
     lastPostIdRef.current = postId;
-    setCaption(post?.caption || '');
-    setHashtags(post?.hashtags?.join(' ') || '');
-  }, [postId]);
+    setCaption(initialCaption);
+    setHashtags(initialHashtags);
+  }, [initialCaption, initialHashtags, parseHashtagsText, postId, updatePost]);
 
   const handleCaptionBlur = useCallback(() => {
     persistPost({ caption });

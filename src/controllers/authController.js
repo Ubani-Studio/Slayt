@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Profile = require('../models/Profile');
 const { generateToken } = require('../middleware/auth');
 const axios = require('axios');
 const passport = require('../config/passport');
@@ -6,6 +7,191 @@ const cloudinaryService = require('../services/cloudinaryService');
 const { useCloudStorage, uploadDir } = require('../middleware/upload');
 const path = require('path');
 const fs = require('fs').promises;
+const {
+  DEFAULT_CLAROSA_BASE_URL,
+  normalizeClarosaBaseUrl,
+  resolveClarosaConnection,
+  indexClarosaLibrary: requestClarosaLibraryIndex,
+  getClarosaErrorMessage,
+} = require('../services/clarosaService');
+
+const BACKEND_BASE_URL = `${process.env.API_URL || process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 3002}`}`.replace(/\/+$/, '');
+const FRONTEND_BASE_URL = `${process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173'}`.replace(/\/+$/, '');
+const INSTAGRAM_CONNECT_CALLBACK_URL = `${process.env.INSTAGRAM_CONNECT_REDIRECT_URI || `${BACKEND_BASE_URL}/api/auth/instagram/connect/callback`}`.replace(/\/+$/, '');
+const TIKTOK_CONNECT_CALLBACK_URL = `${process.env.TIKTOK_REDIRECT_URI || `${BACKEND_BASE_URL}/api/auth/tiktok/callback`}`.replace(/\/+$/, '');
+const YOUTUBE_CONNECT_CALLBACK_URL = `${process.env.YOUTUBE_REDIRECT_URI || `${BACKEND_BASE_URL}/api/auth/youtube/callback`}`.replace(/\/+$/, '');
+
+const encodeOAuthState = (payload = {}) => Buffer.from(JSON.stringify(payload)).toString('base64');
+
+const decodeOAuthState = (value = '') => {
+  try {
+    return JSON.parse(Buffer.from(String(value), 'base64').toString('utf8'));
+  } catch (error) {
+    return null;
+  }
+};
+
+const buildFrontendRedirect = (pathname = '/connections', query = {}) => {
+  const url = new URL(pathname, `${FRONTEND_BASE_URL}/`);
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, `${value}`);
+    }
+  });
+  return url.toString();
+};
+
+const buildPlatformReadinessAudit = () => {
+  const backendOrigin = BACKEND_BASE_URL;
+  const frontendOrigin = FRONTEND_BASE_URL;
+  const corsOrigin = `${process.env.CLIENT_URL || process.env.FRONTEND_URL || process.env.FOLIO_APP_ORIGIN || 'http://localhost:5173'}`.replace(/\/+$/, '');
+  const requiredEnv = {
+    instagram: ['INSTAGRAM_CLIENT_ID', 'INSTAGRAM_CLIENT_SECRET'],
+    tiktok: ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET'],
+    youtube: ['YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET'],
+  };
+  const callbacks = {
+    instagramConnect: INSTAGRAM_CONNECT_CALLBACK_URL,
+    instagramLogin: `${process.env.INSTAGRAM_REDIRECT_URI || `${backendOrigin}/api/auth/instagram/callback`}`.replace(/\/+$/, ''),
+    tiktok: TIKTOK_CONNECT_CALLBACK_URL,
+    youtube: YOUTUBE_CONNECT_CALLBACK_URL,
+  };
+  const warnings = [];
+
+  if (process.env.CLIENT_URL && process.env.FRONTEND_URL && process.env.CLIENT_URL !== process.env.FRONTEND_URL) {
+    warnings.push('CLIENT_URL and FRONTEND_URL differ. OAuth redirects and CORS should use the same frontend origin.');
+  }
+  if (!process.env.API_URL && !process.env.BACKEND_PUBLIC_URL) {
+    warnings.push('API_URL is not set. OAuth callbacks will use the local backend default.');
+  }
+  if (!process.env.CLIENT_URL && !process.env.FRONTEND_URL) {
+    warnings.push('CLIENT_URL is not set. Frontend redirects will use the local default.');
+  }
+
+  const platforms = Object.fromEntries(
+    Object.entries(requiredEnv).map(([platform, envNames]) => {
+      const missingEnv = envNames.filter((name) => !process.env[name]);
+      return [platform, {
+        ready: missingEnv.length === 0,
+        missingEnv,
+        callbackUrl: platform === 'instagram' ? callbacks.instagramConnect : callbacks[platform],
+      }];
+    })
+  );
+
+  return {
+    backendOrigin,
+    frontendOrigin,
+    corsOrigin,
+    callbacks,
+    warnings,
+    platforms,
+  };
+};
+
+const buildInstagramConnectUrl = ({ userId, profileId } = {}) => {
+  const params = new URLSearchParams({
+    client_id: process.env.INSTAGRAM_CLIENT_ID,
+    redirect_uri: INSTAGRAM_CONNECT_CALLBACK_URL,
+    scope: 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights',
+    response_type: 'code',
+    state: encodeOAuthState({
+      platform: 'instagram',
+      userId: userId ? `${userId}` : undefined,
+      profileId: profileId ? `${profileId}` : undefined,
+    }),
+  });
+
+  return `https://api.instagram.com/oauth/authorize?${params.toString()}`;
+};
+
+const buildTikTokConnectUrl = ({ userId, profileId } = {}) => {
+  const params = new URLSearchParams({
+    client_key: process.env.TIKTOK_CLIENT_KEY,
+    redirect_uri: TIKTOK_CONNECT_CALLBACK_URL,
+    scope: 'user.info.basic,video.upload,video.publish',
+    response_type: 'code',
+    state: encodeOAuthState({
+      platform: 'tiktok',
+      userId: userId ? `${userId}` : undefined,
+      profileId: profileId ? `${profileId}` : undefined,
+    }),
+  });
+
+  return `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
+};
+
+const upsertInstagramConnection = async ({ userId, profileId, connection }) => {
+  if (profileId) {
+    const profile = await Profile.findOne({ _id: profileId, userId });
+    if (!profile) {
+      throw new Error('Profile not found for Instagram connection');
+    }
+
+    profile.socialAccounts.instagram = {
+      connected: true,
+      accessToken: connection.accessToken,
+      refreshToken: connection.refreshToken || null,
+      userId: connection.userId || null,
+      username: connection.username || null,
+      expiresAt: connection.expiresAt || null,
+      useParentConnection: false,
+    };
+    await profile.save();
+    return;
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found for Instagram connection');
+  }
+
+  user.socialAccounts.instagram = {
+    connected: true,
+    accessToken: connection.accessToken,
+    refreshToken: connection.refreshToken || null,
+    userId: connection.userId || null,
+    username: connection.username || null,
+    expiresAt: connection.expiresAt || null,
+  };
+  await user.save();
+};
+
+const upsertTiktokConnection = async ({ userId, profileId, connection }) => {
+  if (profileId) {
+    const profile = await Profile.findOne({ _id: profileId, userId });
+    if (!profile) {
+      throw new Error('Profile not found for TikTok connection');
+    }
+
+    profile.socialAccounts.tiktok = {
+      connected: true,
+      accessToken: connection.accessToken,
+      refreshToken: connection.refreshToken || null,
+      userId: connection.userId || null,
+      username: connection.username || null,
+      expiresAt: connection.expiresAt || null,
+      useParentConnection: false,
+    };
+    await profile.save();
+    return;
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found for TikTok connection');
+  }
+
+  user.socialAccounts.tiktok = {
+    connected: true,
+    accessToken: connection.accessToken,
+    refreshToken: connection.refreshToken || null,
+    userId: connection.userId || null,
+    username: connection.username || null,
+    expiresAt: connection.expiresAt || null,
+  };
+  await user.save();
+};
 
 // Register new user
 exports.register = async (req, res) => {
@@ -72,8 +258,18 @@ exports.login = async (req, res) => {
         email: user.email,
         name: user.name,
         socialAccounts: {
-          instagram: { connected: user.socialAccounts.instagram.connected },
-          tiktok: { connected: user.socialAccounts.tiktok.connected }
+          instagram: {
+            connected: user.socialAccounts.instagram.connected,
+            username: user.socialAccounts.instagram.username || null,
+          },
+          tiktok: {
+            connected: user.socialAccounts.tiktok.connected,
+            username: user.socialAccounts.tiktok.username || null,
+          },
+          youtube: {
+            connected: user.socialAccounts.youtube?.connected || Boolean(user.socialMedia?.youtube?.accessToken),
+            channelTitle: user.socialAccounts.youtube?.channelTitle || user.socialMedia?.youtube?.channelTitle || null,
+          },
         }
       }
     });
@@ -143,6 +339,97 @@ exports.updateProfile = async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ error: 'Failed to update profile' });
+  }
+};
+
+exports.updateClarosaConnection = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const {
+      baseUrl,
+      workspaceId,
+      autoSyncOnUpload = true,
+      connected = true,
+    } = req.body;
+
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const currentClarosa = typeof user.clarosa?.toObject === 'function'
+      ? user.clarosa.toObject()
+      : (user.clarosa || {});
+
+    if (connected === false) {
+      user.clarosa = {
+        ...currentClarosa,
+        connected: false,
+        autoSyncOnUpload: true,
+        lastError: null,
+      };
+    } else {
+      user.clarosa = {
+        ...currentClarosa,
+        connected: true,
+        baseUrl: normalizeClarosaBaseUrl(baseUrl || DEFAULT_CLAROSA_BASE_URL),
+        workspaceId: `${workspaceId || 'default'}`.trim() || 'default',
+        autoSyncOnUpload: autoSyncOnUpload !== false,
+        lastError: null,
+      };
+    }
+
+    await user.save();
+
+    res.json({
+      message: user.clarosa.connected ? 'Clarosa linked successfully' : 'Clarosa disconnected',
+      user,
+    });
+  } catch (error) {
+    console.error('Update Clarosa connection error:', error);
+    res.status(500).json({ error: 'Failed to update Clarosa connection' });
+  }
+};
+
+exports.indexClarosaLibrary = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const clarosaConnection = resolveClarosaConnection(user);
+    if (!clarosaConnection) {
+      return res.status(400).json({ error: 'Link Clarosa before indexing its library' });
+    }
+
+    const result = await requestClarosaLibraryIndex(clarosaConnection);
+    const currentClarosa = typeof user.clarosa?.toObject === 'function'
+      ? user.clarosa.toObject()
+      : (user.clarosa || {});
+
+    user.clarosa = {
+      ...currentClarosa,
+      lastIndexedAt: new Date(),
+      lastIndexedSummary: result,
+      lastError: null,
+    };
+    await user.save();
+
+    res.json({
+      message: 'Clarosa library indexed successfully',
+      result,
+      user,
+    });
+  } catch (error) {
+    const detail = getClarosaErrorMessage(error);
+    console.error('Index Clarosa library error:', error);
+    await User.findByIdAndUpdate(req.userId, {
+      $set: {
+        'clarosa.lastError': detail,
+      },
+    });
+    res.status(error.response?.status || 502).json({ error: detail });
   }
 };
 
@@ -335,31 +622,44 @@ exports.instagramLoginCallback = (req, res, next) => {
 // Instagram OAuth - Initiate Account Connection (for existing users)
 exports.instagramAuth = (req, res) => {
   if (!process.env.INSTAGRAM_CLIENT_ID || !process.env.INSTAGRAM_CLIENT_SECRET) {
-    return res.redirect('/?instagram=error&message=credentials_missing');
+    return res.status(500).json({ error: 'Instagram credentials are not configured' });
   }
-  const clientId = process.env.INSTAGRAM_CLIENT_ID;
-  const redirectUri = process.env.INSTAGRAM_CONNECT_REDIRECT_URI || 'http://localhost:3000/api/auth/instagram/connect/callback';
-  const scope = 'user_profile,user_media';
 
-  const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
-
-  res.redirect(authUrl);
+  res.json({
+    url: buildInstagramConnectUrl({ userId: req.userId }),
+  });
 };
 
 // Instagram OAuth - Callback
 exports.instagramCallback = async (req, res) => {
   try {
-    const { code } = req.query;
-    const userId = req.user._id; // Assuming user is authenticated
+    const { code, state } = req.query;
+    const stateData = decodeOAuthState(state);
+    const userId = stateData?.userId;
+    const profileId = stateData?.profileId;
+
+    if (!userId) {
+      return res.redirect(buildFrontendRedirect('/connections', { instagram_error: 'missing_state' }));
+    }
 
     // Exchange code for access token
-    const tokenResponse = await axios.post('https://api.instagram.com/oauth/access_token', {
+    const tokenParams = new URLSearchParams({
       client_id: process.env.INSTAGRAM_CLIENT_ID,
       client_secret: process.env.INSTAGRAM_CLIENT_SECRET,
       grant_type: 'authorization_code',
-      redirect_uri: process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:3000/api/auth/instagram/callback',
-      code
+      redirect_uri: INSTAGRAM_CONNECT_CALLBACK_URL,
+      code,
     });
+
+    const tokenResponse = await axios.post(
+      'https://api.instagram.com/oauth/access_token',
+      tokenParams.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      },
+    );
 
     const { access_token, user_id } = tokenResponse.data;
 
@@ -375,20 +675,34 @@ exports.instagramCallback = async (req, res) => {
     const longLivedToken = longLivedResponse.data.access_token;
     const expiresIn = longLivedResponse.data.expires_in;
 
-    // Update user
-    const user = await User.findById(userId);
-    user.socialAccounts.instagram = {
-      connected: true,
-      accessToken: longLivedToken,
-      userId: user_id,
-      expiresAt: new Date(Date.now() + expiresIn * 1000)
-    };
-    await user.save();
+    let instagramUsername = null;
+    try {
+      const meResponse = await axios.get('https://graph.instagram.com/me', {
+        params: {
+          fields: 'id,username,account_type',
+          access_token: longLivedToken,
+        },
+      });
+      instagramUsername = meResponse.data?.username || null;
+    } catch (profileError) {
+      console.warn('Failed to fetch Instagram username during connection:', profileError.response?.data || profileError.message);
+    }
 
-    res.redirect('/?instagram=connected');
+    await upsertInstagramConnection({
+      userId,
+      profileId,
+      connection: {
+        accessToken: longLivedToken,
+        userId: user_id,
+        username: instagramUsername,
+        expiresAt: new Date(Date.now() + expiresIn * 1000),
+      },
+    });
+
+    res.redirect(buildFrontendRedirect('/connections', { instagram_success: 'true' }));
   } catch (error) {
     console.error('Instagram callback error:', error);
-    res.redirect('/?instagram=error');
+    res.redirect(buildFrontendRedirect('/connections', { instagram_error: 'callback_failed' }));
   }
 };
 
@@ -413,58 +727,109 @@ exports.disconnectInstagram = async (req, res) => {
   }
 };
 
+exports.refreshInstagramConnection = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user?.socialAccounts?.instagram?.connected || !user.socialAccounts.instagram.accessToken) {
+      return res.status(400).json({ error: 'Instagram not connected' });
+    }
+
+    const response = await axios.get('https://graph.instagram.com/refresh_access_token', {
+      params: {
+        grant_type: 'ig_refresh_token',
+        access_token: user.socialAccounts.instagram.accessToken,
+      },
+    });
+
+    user.socialAccounts.instagram.accessToken = response.data.access_token;
+    user.socialAccounts.instagram.expiresAt = new Date(Date.now() + (response.data.expires_in || 0) * 1000);
+    await user.save();
+
+    res.json({ message: 'Instagram token refreshed successfully' });
+  } catch (error) {
+    console.error('Refresh Instagram token error:', error.response?.data || error);
+    res.status(500).json({ error: 'Failed to refresh Instagram token' });
+  }
+};
+
 // TikTok OAuth - Initiate
 exports.tiktokAuth = (req, res) => {
-  const clientKey = process.env.TIKTOK_CLIENT_KEY;
-  const redirectUri = process.env.TIKTOK_REDIRECT_URI || 'http://localhost:3000/api/auth/tiktok/callback';
-  const scope = 'user.info.basic,video.list,video.upload';
+  if (!process.env.TIKTOK_CLIENT_KEY || !process.env.TIKTOK_CLIENT_SECRET) {
+    return res.status(500).json({ error: 'TikTok credentials are not configured' });
+  }
 
-  const csrfState = Math.random().toString(36).substring(7);
-  req.session.csrfState = csrfState;
-
-  const authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&scope=${scope}&response_type=code&redirect_uri=${redirectUri}&state=${csrfState}`;
-
-  res.redirect(authUrl);
+  res.json({
+    url: buildTikTokConnectUrl({ userId: req.userId }),
+  });
 };
 
 // TikTok OAuth - Callback
 exports.tiktokCallback = async (req, res) => {
   try {
     const { code, state } = req.query;
+    const stateData = decodeOAuthState(state);
+    const userId = stateData?.userId;
+    const profileId = stateData?.profileId;
 
-    // Verify CSRF state
-    if (state !== req.session.csrfState) {
-      return res.redirect('/?tiktok=error');
+    if (!userId) {
+      return res.redirect(buildFrontendRedirect('/connections', { tiktok_error: 'missing_state' }));
     }
 
-    const userId = req.user._id;
-
     // Exchange code for access token
-    const tokenResponse = await axios.post('https://open.tiktokapis.com/v2/oauth/token/', {
+    const tokenParams = new URLSearchParams({
       client_key: process.env.TIKTOK_CLIENT_KEY,
       client_secret: process.env.TIKTOK_CLIENT_SECRET,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: process.env.TIKTOK_REDIRECT_URI || 'http://localhost:3000/api/auth/tiktok/callback'
+      redirect_uri: TIKTOK_CONNECT_CALLBACK_URL,
     });
 
-    const { access_token, refresh_token, expires_in, open_id } = tokenResponse.data;
+    const tokenResponse = await axios.post(
+      'https://open.tiktokapis.com/v2/oauth/token/',
+      tokenParams.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      },
+    );
 
-    // Update user
-    const user = await User.findById(userId);
-    user.socialAccounts.tiktok = {
-      connected: true,
-      accessToken: access_token,
-      refreshToken: refresh_token,
-      userId: open_id,
-      expiresAt: new Date(Date.now() + expires_in * 1000)
-    };
-    await user.save();
+    const tokenData = tokenResponse.data?.data || tokenResponse.data;
+    const { access_token, refresh_token, expires_in, open_id } = tokenData;
 
-    res.redirect('/?tiktok=connected');
+    let creatorInfo = null;
+    try {
+      const creatorInfoResponse = await axios.post(
+        'https://open.tiktokapis.com/v2/post/publish/creator_info/query/',
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+        },
+      );
+      creatorInfo = creatorInfoResponse.data?.data || null;
+    } catch (creatorInfoError) {
+      console.warn('Failed to fetch TikTok creator info during connection:', creatorInfoError.response?.data || creatorInfoError.message);
+    }
+
+    await upsertTiktokConnection({
+      userId,
+      profileId,
+      connection: {
+        accessToken: access_token,
+        refreshToken: refresh_token,
+        userId: open_id,
+        username: creatorInfo?.creator_username || creatorInfo?.creator_nickname || open_id || null,
+        expiresAt: new Date(Date.now() + (expires_in || 0) * 1000),
+      },
+    });
+
+    res.redirect(buildFrontendRedirect('/connections', { tiktok_success: 'true' }));
   } catch (error) {
     console.error('TikTok callback error:', error);
-    res.redirect('/?tiktok=error');
+    res.redirect(buildFrontendRedirect('/connections', { tiktok_error: 'callback_failed' }));
   }
 };
 
@@ -489,6 +854,82 @@ exports.disconnectTiktok = async (req, res) => {
   }
 };
 
+exports.refreshTiktokConnection = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user?.socialAccounts?.tiktok?.connected || !user.socialAccounts.tiktok.refreshToken) {
+      return res.status(400).json({ error: 'TikTok not connected' });
+    }
+
+    const tokenParams = new URLSearchParams({
+      client_key: process.env.TIKTOK_CLIENT_KEY,
+      client_secret: process.env.TIKTOK_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      refresh_token: user.socialAccounts.tiktok.refreshToken,
+    });
+
+    const response = await axios.post(
+      'https://open.tiktokapis.com/v2/oauth/token/',
+      tokenParams.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      },
+    );
+
+    const tokenData = response.data?.data || response.data;
+    user.socialAccounts.tiktok.accessToken = tokenData.access_token;
+    user.socialAccounts.tiktok.refreshToken = tokenData.refresh_token || user.socialAccounts.tiktok.refreshToken;
+    user.socialAccounts.tiktok.expiresAt = new Date(Date.now() + (tokenData.expires_in || 0) * 1000);
+    await user.save();
+
+    res.json({ message: 'TikTok token refreshed successfully' });
+  } catch (error) {
+    console.error('Refresh TikTok token error:', error.response?.data || error);
+    res.status(500).json({ error: 'Failed to refresh TikTok token' });
+  }
+};
+
+exports.getConnections = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('socialAccounts socialMedia');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      instagram: {
+        connected: Boolean(user.socialAccounts?.instagram?.connected),
+        username: user.socialAccounts?.instagram?.username || null,
+      },
+      tiktok: {
+        connected: Boolean(user.socialAccounts?.tiktok?.connected),
+        username: user.socialAccounts?.tiktok?.username || null,
+      },
+      youtube: {
+        connected: Boolean(user.socialAccounts?.youtube?.connected || user.socialMedia?.youtube?.accessToken),
+        channelTitle: user.socialAccounts?.youtube?.channelTitle || user.socialMedia?.youtube?.channelTitle || null,
+      },
+      pinterest: {
+        connected: false,
+      },
+    });
+  } catch (error) {
+    console.error('Get connections error:', error);
+    res.status(500).json({ error: 'Failed to fetch platform connections' });
+  }
+};
+
+exports.getPlatformReadinessAudit = async (req, res) => {
+  try {
+    res.json(buildPlatformReadinessAudit());
+  } catch (error) {
+    console.error('Get platform readiness audit error:', error);
+    res.status(500).json({ error: 'Failed to build platform readiness audit' });
+  }
+};
+
 // Get social media connection status
 exports.getSocialStatus = async (req, res) => {
   try {
@@ -502,6 +943,10 @@ exports.getSocialStatus = async (req, res) => {
       tiktok: {
         connected: user.socialAccounts.tiktok.connected,
         username: user.socialAccounts.tiktok.username
+      },
+      youtube: {
+        connected: user.socialAccounts?.youtube?.connected || Boolean(user.socialMedia?.youtube?.accessToken),
+        username: user.socialAccounts?.youtube?.channelTitle || user.socialMedia?.youtube?.channelTitle || null,
       }
     });
   } catch (error) {
@@ -525,7 +970,7 @@ exports.googleAuth = (req, res, next) => {
 exports.googleCallback = (req, res, next) => {
   passport.authenticate('google', { session: false }, async (err, user, info) => {
     try {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
 
       if (err || !user) {
         console.error('Google auth error:', err || 'No user returned');

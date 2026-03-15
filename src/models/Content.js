@@ -25,6 +25,45 @@ const contentSchema = new mongoose.Schema({
     }
   },
   thumbnailUrl: String,
+  contentHash: {
+    type: String,
+    index: true
+  },
+  clarosa: {
+    connected: {
+      type: Boolean,
+      default: false
+    },
+    workspaceId: String,
+    baseUrl: String,
+    contentHash: String,
+    status: {
+      type: String,
+      enum: ['matched', 'unmatched', 'lookup_failed'],
+      default: 'unmatched'
+    },
+    hasMatch: {
+      type: Boolean,
+      default: false
+    },
+    rating: Number,
+    favorite: {
+      type: Boolean,
+      default: false
+    },
+    markedForDelete: {
+      type: Boolean,
+      default: false
+    },
+    deleteReason: String,
+    notes: String,
+    colorCategory: String,
+    dominantColor: String,
+    remoteUpdatedAt: Date,
+    matchedAt: Date,
+    lastSyncedAt: Date,
+    lastError: String
+  },
   // Non-destructive edit settings per platform (Instagram/TikTok/Twitter)
   editSettings: {
     type: mongoose.Schema.Types.Mixed,
@@ -320,6 +359,15 @@ const contentSchema = new mongoose.Schema({
   scheduledFor: Date,
   scheduledTime: Date, // Alias for scheduledFor (frontend compatibility)
   scheduledPlatform: String, // Platform(s) for scheduled post
+  scheduledPlatforms: [{
+    type: String,
+    enum: ['instagram', 'tiktok', 'youtube']
+  }],
+  scheduledProfileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Profile',
+    default: undefined,
+  },
   autoPost: {
     type: Boolean,
     default: false

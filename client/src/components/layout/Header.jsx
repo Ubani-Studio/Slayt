@@ -10,6 +10,12 @@ import {
 function Header() {
   const navigate = useNavigate();
   const user = useAppStore((state) => state.user);
+  const profiles = useAppStore((state) => state.profiles);
+  const currentProfileId = useAppStore((state) => state.currentProfileId);
+
+  const currentProfile = profiles.find((profile) => (profile._id || profile.id) === currentProfileId) || null;
+  const resolvedAvatar = currentProfile?.avatar || user?.avatar || null;
+  const resolvedName = currentProfile?.name || user?.name || 'Profile';
 
   return (
     <header className="h-16 bg-dark-800/80 backdrop-blur-sm border-b border-dark-700 flex items-center justify-end px-6 sticky top-0 z-30">
@@ -47,11 +53,14 @@ function Header() {
           className="flex items-center gap-2 p-1.5 rounded-md hover:bg-dark-700 transition-colors"
           title="Profile Settings"
         >
-          <div className="w-8 h-8 rounded-full bg-dark-600 overflow-hidden relative">
-            {user?.avatar ? (
+          <div
+            className="w-8 h-8 rounded-full bg-dark-600 overflow-hidden relative"
+            style={currentProfile?.color ? { backgroundColor: currentProfile.color } : undefined}
+          >
+            {resolvedAvatar ? (
               <img
-                src={user.avatar}
-                alt={user.name || 'Profile'}
+                src={resolvedAvatar}
+                alt={resolvedName}
                 className="w-full h-full object-cover"
               />
             ) : (

@@ -4,6 +4,12 @@ import { youtubeApi } from '../lib/api';
 import CruciblaProjectPicker from '../components/CruciblaProjectPicker';
 import { compressImage } from '../lib/imageUtils';
 import { extractVideoFrame, hasPlannerVideoAttachment } from '../lib/videoUtils';
+import { buildYoutubeUploadTitle } from '../lib/youtubeUploadTitle';
+import {
+  getCollectionDescriptionTemplate,
+  renderYoutubeDescriptionTemplate,
+} from '../lib/youtubeDescriptionTemplate';
+import { getYoutubeThumbnailWarning } from '../lib/youtubeThumbnailWarnings';
 import YouTubeGridView from '../components/youtube/YouTubeGridView';
 import YouTubeSidebarView from '../components/youtube/YouTubeSidebarView';
 import YouTubeVideoDetails from '../components/youtube/YouTubeVideoDetails';
@@ -197,6 +203,16 @@ function YouTubePlanner() {
     || youtubeCollections?.[0]
     || { id: 'default', name: 'My Videos' };
 
+  const buildCollectionDescription = useCallback((videoMeta = {}) => (
+    renderYoutubeDescriptionTemplate({
+      template: getCollectionDescriptionTemplate(currentCollection),
+      title: videoMeta.title || '',
+      artistName: videoMeta.artistName || '',
+      featuringArtists: videoMeta.featuringArtists || [],
+      collectionName: currentCollection?.name || '',
+    })
+  ), [currentCollection]);
+
   const dismissPlannerNotice = useCallback((noticeId) => {
     setPlannerNotices((current) => current.filter((notice) => notice.id !== noticeId));
     const timeoutId = plannerNoticeTimeoutsRef.current.get(noticeId);
@@ -253,6 +269,7 @@ function YouTubePlanner() {
       nextSnapshot.set(videoId, {
         status: video.status || 'draft',
         title: video.title || 'Untitled video',
+        artistName: video.artistName || '',
         lastError: video.lastError || '',
         youtubeVideoUrl: video.youtubeVideoUrl || '',
       });
@@ -267,21 +284,46 @@ function YouTubePlanner() {
       }
 
       if (previous.status === 'scheduled' && video.status === 'published') {
-        const title = video.title || 'Untitled video';
+        const title = buildYoutubeUploadTitle({
+          title: video.title,
+          artistName: video.artistName,
+          featuringArtists: video.featuringArtists,
+          fallbackTitle: 'Untitled video',
+        });
+        const thumbnailWarning = getYoutubeThumbnailWarning(video.lastError);
         pushPlannerNotice({
-          title: 'YouTube upload complete',
-          message: `"${title}" is now on YouTube.`,
-          tone: 'success',
+          title: thumbnailWarning
+            ? 'Published without custom thumbnail'
+            : video.lastError
+              ? 'YouTube upload complete with warning'
+              : 'YouTube upload complete',
+          message: thumbnailWarning
+            ? `"${title}" uploaded, but YouTube did not apply the custom thumbnail.`
+            : video.lastError
+            ? `"${title}" uploaded, but ${video.lastError}`
+            : `"${title}" is now on YouTube.`,
+          tone: (video.lastError || thumbnailWarning) ? 'warning' : 'success',
         });
         maybeSendBrowserNotice({
-          title: 'Slayt: YouTube upload complete',
-          message: title,
+          title: thumbnailWarning
+            ? 'Slayt: Custom thumbnail not applied'
+            : video.lastError
+              ? 'Slayt: YouTube upload warning'
+              : 'Slayt: YouTube upload complete',
+          message: thumbnailWarning
+            ? title
+            : video.lastError ? `${title}: ${video.lastError}` : title,
           tag: `youtube-published-${videoId}`,
         });
       }
 
       if (previous.status === 'scheduled' && video.status === 'failed') {
-        const title = video.title || 'Untitled video';
+        const title = buildYoutubeUploadTitle({
+          title: video.title,
+          artistName: video.artistName,
+          featuringArtists: video.featuringArtists,
+          fallbackTitle: 'Untitled video',
+        });
         const reason = video.lastError || 'The upload could not be completed.';
         pushPlannerNotice({
           title: 'YouTube upload failed',
@@ -525,13 +567,14 @@ function YouTubePlanner() {
         name: `${sourceCollection.name} (Copy)`,
         color: sourceCollection.color,
         tags: sourceCollection.tags || [],
+        descriptionTemplate: sourceCollection.descriptionTemplate,
       });
 
       const newCollectionId = data.collection._id;
 
       // Fetch source videos from backend and duplicate them into the new collection
       const sourceData = await youtubeApi.getVideos(collectionId);
-      const sourceVideos = sourceData.videos || [];
+        const sourceVideos = sourceData.videos || [];
 
       for (let i = 0; i < sourceVideos.length; i++) {
         const v = sourceVideos[i];
@@ -548,6 +591,8 @@ function YouTubePlanner() {
           tags: v.tags || [],
           ...buildVideoPersistencePayload(v),
           artistName: v.artistName || '',
+          featuringArtists: v.featuringArtists || [],
+          endScreenTemplate: v.endScreenTemplate || 'video_subscribe',
           originalFilename: v.originalFilename || '',
           thumbnailSourceFilename: v.thumbnailSourceFilename || '',
           position: i,
@@ -889,6 +934,7 @@ function YouTubePlanner() {
       try {
         const thumbnail = await processImageFile(file);
         const title = getBaseTitleFromFile(file.name);
+        const description = buildCollectionDescription({ title });
 
         updateBatchUploadProgress({
           label: 'Uploading',
@@ -899,7 +945,7 @@ function YouTubePlanner() {
 
         const data = await youtubeApi.createVideo({
           title,
-          description: '',
+          description,
           thumbnail,
           collectionId: currentYoutubeCollectionId,
           status: 'draft',
@@ -1018,7 +1064,9 @@ function YouTubePlanner() {
 
         const data = await youtubeApi.createVideo({
           title: getBaseTitleFromFile(file.name),
-          description: '',
+          description: buildCollectionDescription({
+            title: getBaseTitleFromFile(file.name),
+          }),
           thumbnail: videoAsset.thumbnailDataUrl,
           collectionId: currentYoutubeCollectionId,
           status: 'draft',
@@ -1061,6 +1109,7 @@ function YouTubePlanner() {
     }
   }, [
     currentYoutubeCollectionId,
+    buildCollectionDescription,
     getBaseTitleFromFile,
     processImageFile,
     resolveThumbnailChoice,
@@ -1129,6 +1178,8 @@ function YouTubePlanner() {
         thumbnailSourceFilename: video.thumbnailSourceFilename || video.originalFilename || '',
         ...buildVideoPersistencePayload(video),
         artistName: video.artistName || '',
+        featuringArtists: video.featuringArtists || [],
+        endScreenTemplate: video.endScreenTemplate || 'video_subscribe',
       },
     });
   }, [currentCollection.name, currentYoutubeCollectionId]);
@@ -1157,6 +1208,8 @@ function YouTubePlanner() {
         thumbnailSourceFilename: video.thumbnailSourceFilename || video.originalFilename || '',
         ...buildVideoPersistencePayload(video),
         artistName: video.artistName || '',
+        featuringArtists: video.featuringArtists || [],
+        endScreenTemplate: video.endScreenTemplate || 'video_subscribe',
       },
     });
   }, [currentCollection.name, currentYoutubeCollectionId]);
@@ -1321,7 +1374,9 @@ function YouTubePlanner() {
                 ? 'border-emerald-500/30 bg-emerald-500/10'
                 : notice.tone === 'error'
                   ? 'border-red-500/30 bg-red-500/10'
-                  : 'border-dark-600 bg-dark-800/95';
+                  : notice.tone === 'warning'
+                    ? 'border-amber-500/30 bg-amber-500/10'
+                    : 'border-dark-600 bg-dark-800/95';
 
             return (
               <div
@@ -1906,6 +1961,7 @@ function YouTubePlanner() {
           video={selectedVideo}
           onThumbnailUpload={handleThumbnailUpload}
           videoClipboard={videoClipboard}
+          currentCollection={currentCollection}
           currentCollectionName={currentCollection.name}
           onCopyVideo={handleCopyVideo}
           onCutVideo={handleCutVideo}

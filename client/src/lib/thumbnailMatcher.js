@@ -1,6 +1,6 @@
 /**
  * Thumbnail-to-video matching utility.
- * Matches dropped image files to existing videos by filename ↔ title/originalFilename.
+ * Matches dropped image files to existing videos by filename ↔ title/source metadata.
  */
 
 /**
@@ -56,31 +56,42 @@ function wordOverlapScore(a, b) {
 function computeMatch(file, video) {
   const fileNorm = normalizeForMatch(file.name);
   const titleNorm = normalizeForMatch(video.title);
+  const sourceNorm = normalizeForMatch(video.thumbnailSourceFilename);
   const origNorm = normalizeForMatch(video.originalFilename);
 
-  // 1. Exact match on originalFilename (best possible)
-  if (origNorm && fileNorm === origNorm) {
+  // 1. Exact match on stored thumbnail source filename (best possible)
+  if (sourceNorm && fileNorm === sourceNorm) {
     return { confidence: 'exact', score: 100 };
   }
 
-  // 2. Exact match on title
+  // 2. Exact match on originalFilename (legacy metadata)
+  if (origNorm && fileNorm === origNorm) {
+    return { confidence: 'exact', score: 98 };
+  }
+
+  // 3. Exact match on title
   if (fileNorm === titleNorm) {
     return { confidence: 'exact', score: 95 };
   }
 
-  // 3. Original filename starts with or contains file name (or vice versa)
+  // 4. Source metadata starts with or contains file name (or vice versa)
+  if (sourceNorm && (sourceNorm.includes(fileNorm) || fileNorm.includes(sourceNorm))) {
+    return { confidence: 'high', score: 88 };
+  }
+
+  // 5. Original filename starts with or contains file name (or vice versa)
   if (origNorm && (origNorm.includes(fileNorm) || fileNorm.includes(origNorm))) {
     return { confidence: 'high', score: 85 };
   }
 
-  // 4. Artist-stripped title match
+  // 6. Artist-stripped title match
   const fileStripped = stripArtistPrefix(file.name);
   const titleStripped = stripArtistPrefix(video.title);
   if (fileStripped === titleStripped && fileStripped.length > 2) {
     return { confidence: 'high', score: 80 };
   }
 
-  // 5. startsWith / includes on title
+  // 7. startsWith / includes on title
   if (titleNorm.startsWith(fileNorm) || fileNorm.startsWith(titleNorm)) {
     return { confidence: 'medium', score: 70 };
   }
@@ -88,7 +99,7 @@ function computeMatch(file, video) {
     return { confidence: 'medium', score: 60 };
   }
 
-  // 6. Word overlap
+  // 8. Word overlap
   const overlap = wordOverlapScore(fileNorm, titleNorm);
   if (overlap >= 0.75) {
     return { confidence: 'medium', score: 50 + overlap * 10 };
@@ -105,7 +116,7 @@ function computeMatch(file, video) {
  * Each video can be matched at most once (greedy best-match).
  *
  * @param {File[]} files - Image files to match
- * @param {Array} videos - Video objects with { _id, id, title, originalFilename, ... }
+ * @param {Array} videos - Video objects with { _id, id, title, thumbnailSourceFilename, originalFilename, ... }
  * @returns {{ matched: Array<{ file: File, video: object, confidence: string, score: number }>, unmatched: File[] }}
  */
 export function matchFilesToVideos(files, videos) {

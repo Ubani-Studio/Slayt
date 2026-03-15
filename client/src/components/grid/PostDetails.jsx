@@ -35,13 +35,18 @@ function PostDetails({ post }) {
   const primaryImageSrc = resolvePrimaryImageSource(post);
   const originalImageSrc = post?.originalImage || primaryImageSrc;
   const postId = post?.id || post?._id || null;
+  const supportedPostPlatforms = ['instagram', 'tiktok', 'youtube'];
+  const postNowPlatform = supportedPostPlatforms.includes(qe.activeTab)
+    ? qe.activeTab
+    : (supportedPostPlatforms.includes(post?.platform) ? post.platform : 'instagram');
 
   const handlePostNow = async () => {
     setPosting(true);
     try {
-      await postingApi.postNow(postId, ['instagram'], {
+      await postingApi.postNow(postId, [postNowPlatform], {
         caption: persistence.caption,
         hashtags: persistence.parseHashtagsText(persistence.hashtags),
+        profileId: currentProfileId || undefined,
       });
       alert('Post published successfully!');
     } catch (error) {
@@ -229,7 +234,14 @@ function PostDetails({ post }) {
       </div>
 
       {showScheduleModal && (
-        <ScheduleModal postId={postId} caption={persistence.caption} hashtags={persistence.hashtags} onClose={() => setShowScheduleModal(false)} />
+        <ScheduleModal
+          postId={postId}
+          caption={persistence.caption}
+          hashtags={persistence.hashtags}
+          profileId={currentProfileId || undefined}
+          defaultPlatform={postNowPlatform}
+          onClose={() => setShowScheduleModal(false)}
+        />
       )}
       {showBestTimeModal && (
         <BestTimeModal onClose={() => setShowBestTimeModal(false)} />

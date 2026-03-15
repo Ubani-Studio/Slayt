@@ -134,7 +134,7 @@ export function generateGridRecommendations(gridItems, currentScore) {
   }
 
   // 2. Score potential analysis
-  const potential = calculateGridPotential(itemsWithConviction, currentScore);
+  const potential = calculateGridPotential(itemsWithConviction);
 
   if (potential.maxScore - currentScore > 10) {
     recommendations.push({
@@ -231,7 +231,7 @@ function findSchedulingGaps(posts, dayPerformance) {
   const gaps = [];
 
   const performanceEntries = Object.entries(dayPerformance)
-    .filter(([_, data]) => data.avgScore > 70)
+    .filter(([, data]) => data.avgScore > 70)
     .sort((a, b) => b[1].avgScore - a[1].avgScore);
 
   performanceEntries.forEach(([day, data]) => {
@@ -248,7 +248,7 @@ function findSchedulingGaps(posts, dayPerformance) {
   return gaps.slice(0, 2);
 }
 
-function calculateGridPotential(items, currentScore) {
+function calculateGridPotential(items) {
   const sortedByScore = [...items].sort((a, b) => b.conviction.score - a.conviction.score);
 
   const avgConviction = sortedByScore.reduce((sum, item) => sum + item.conviction.score, 0) / items.length;

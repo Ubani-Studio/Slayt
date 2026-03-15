@@ -103,6 +103,7 @@ function Settings() {
 
   // Avatar state
   const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
+  const [avatarFile, setAvatarFile] = useState(null);
   const [avatarChanged, setAvatarChanged] = useState(false); // Track if new avatar was uploaded
 
   // Sync form data when user state is hydrated from localStorage
@@ -116,6 +117,8 @@ function Settings() {
         brandName: user.brandName || prev.brandName,
       }));
       setAvatarPreview(user.avatar || null);
+      setAvatarFile(null);
+      setAvatarChanged(false);
     }
   }, [user]);
 
@@ -140,6 +143,7 @@ function Settings() {
     const reader = new FileReader();
     reader.onload = (event) => {
       setAvatarPreview(event.target?.result);
+      setAvatarFile(file);
       setAvatarChanged(true); // Mark that a new avatar was uploaded
     };
     reader.readAsDataURL(file);
@@ -149,6 +153,10 @@ function Settings() {
   const handleSave = async () => {
     setSaveStatus('saving');
     try {
+      const nextAvatarPosition = avatarChanged ? { x: 0, y: 0 } : (user?.avatarPosition || { x: 0, y: 0 });
+      const nextAvatarZoom = avatarChanged ? 1 : (user?.avatarZoom || 1);
+      let resolvedAvatar = avatarPreview;
+
       // Build updated user object
       const updatedUser = {
         ...(user || {}),
@@ -158,30 +166,48 @@ function Settings() {
         bio: formData.bio,
         brandName: formData.brandName,
         avatar: avatarPreview,
-        // Reset position/zoom if new avatar was uploaded via Settings
-        ...(avatarChanged ? { avatarPosition: { x: 0, y: 0 }, avatarZoom: 1 } : {})
+        avatarPosition: nextAvatarPosition,
+        avatarZoom: nextAvatarZoom,
       };
 
       // Try to save to backend if authenticated
       const token = localStorage.getItem('token');
       if (token) {
         try {
+          let uploadedAvatarUser = null;
+
+          if (avatarChanged && avatarFile) {
+            const avatarResult = await authApi.uploadAvatar(avatarFile);
+            resolvedAvatar = avatarResult.avatar || avatarResult.user?.avatar || resolvedAvatar;
+            uploadedAvatarUser = avatarResult.user || null;
+          }
+
           const result = await authApi.updateProfile({
             name: formData.name,
             bio: formData.bio,
             brandName: formData.brandName,
-            avatar: avatarPreview
+            ...(avatarChanged ? { avatarPosition: nextAvatarPosition, avatarZoom: nextAvatarZoom } : {}),
           });
+
+          const nextUser = {
+            ...updatedUser,
+            avatar: resolvedAvatar,
+            ...(uploadedAvatarUser || {}),
+            ...(result.user || {}),
+          };
+
+          setUser(nextUser);
+          setAvatarPreview(resolvedAvatar);
+          setAvatarFile(null);
+
           // Update user in store with data from server
-          if (result.user) {
-            setUser({ ...updatedUser, ...result.user });
-          } else {
-            setUser(updatedUser);
-          }
         } catch (apiError) {
           console.error('API save failed, saving locally:', apiError);
           // Fall back to local save if API fails
-          setUser(updatedUser);
+          setUser({
+            ...updatedUser,
+            avatar: resolvedAvatar,
+          });
         }
       } else {
         // No token - save locally only (demo mode)
@@ -246,6 +272,9 @@ function Settings() {
     alert(`Session ${sessionId} has been logged out`);
   };
 
+  const previewAvatarPosition = avatarChanged ? { x: 0, y: 0 } : (user?.avatarPosition || { x: 0, y: 0 });
+  const previewAvatarZoom = avatarChanged ? 1 : (user?.avatarZoom || 1);
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
@@ -257,10 +286,10 @@ function Settings() {
         </p>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-6 lg:flex-row">
         {/* Sidebar Tabs */}
-        <div className="w-48 flex-shrink-0">
-          <nav className="space-y-1">
+        <div className="w-full flex-shrink-0 lg:w-48">
+          <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-1">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -279,7 +308,7 @@ function Settings() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 bg-dark-800 rounded-2xl border border-dark-700 p-6">
+        <div className="min-w-0 flex-1 bg-dark-800 rounded-2xl border border-dark-700 p-5 sm:p-6">
           {/* Profile */}
           {activeTab === 'profile' && (
             <div className="space-y-6">
@@ -299,7 +328,7 @@ function Settings() {
                         left: '50%',
                         top: '50%',
                         transformOrigin: 'center center',
-                        transform: `translate(-50%, -50%) translate(${(user?.avatarPosition?.x || 0) * 0.3}px, ${(user?.avatarPosition?.y || 0) * 0.3}px) scale(${getActualZoom(user?.avatarZoom || 1)})`,
+                        transform: `translate(-50%, -50%) translate(${previewAvatarPosition.x * 0.3}px, ${previewAvatarPosition.y * 0.3}px) scale(${getActualZoom(previewAvatarZoom)})`,
                       }}
                     />
                   ) : (
@@ -327,7 +356,7 @@ function Settings() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="input-label">Full Name</label>
                   <input
@@ -435,7 +464,7 @@ function Settings() {
                   { key: 'postReminders', label: 'Post Reminders', desc: 'Reminders before scheduled posts' },
                   { key: 'weeklyReport', label: 'Weekly Reports', desc: 'Weekly performance summary' },
                 ].map((item) => (
-                  <div key={item.key} className="flex items-center justify-between">
+                  <div key={item.key} className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-dark-200">{item.label}</p>
                       <p className="text-sm text-dark-500">{item.desc}</p>
@@ -496,7 +525,7 @@ function Settings() {
                 />
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-dark-200">Auto-save Drafts</p>
                   <p className="text-sm text-dark-500">Automatically save your work</p>

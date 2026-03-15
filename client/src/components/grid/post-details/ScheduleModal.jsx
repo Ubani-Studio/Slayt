@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { X, Loader2, Calendar } from 'lucide-react';
 import { postingApi } from '../../../lib/api';
 
-function ScheduleModal({ postId, caption, hashtags, onClose }) {
+function ScheduleModal({ postId, caption, hashtags, profileId, defaultPlatform = 'instagram', onClose }) {
   const [scheduleDate, setScheduleDate] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split('T')[0];
   });
   const [scheduleTime, setScheduleTime] = useState('12:00');
-  const [selectedPlatforms, setSelectedPlatforms] = useState(['instagram']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState([defaultPlatform]);
   const [scheduling, setScheduling] = useState(false);
 
   const togglePlatform = (platform) => {
@@ -23,7 +23,11 @@ function ScheduleModal({ postId, caption, hashtags, onClose }) {
     setScheduling(true);
     try {
       const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`);
-      await postingApi.schedulePost(postId, selectedPlatforms, scheduledAt.toISOString(), { caption, hashtags: hashtags.split(/[\s,#]+/).filter(t => t) });
+      await postingApi.schedulePost(postId, selectedPlatforms, scheduledAt.toISOString(), {
+        caption,
+        hashtags: `${hashtags || ''}`.split(/[\s,#]+/).filter(t => t),
+        profileId,
+      });
       onClose();
       alert('Post scheduled successfully!');
     } catch (error) {
@@ -72,7 +76,7 @@ function ScheduleModal({ postId, caption, hashtags, onClose }) {
           <div>
             <label className="block text-sm font-medium text-dark-200 mb-2">Platforms</label>
             <div className="flex flex-wrap gap-2">
-              {['instagram', 'tiktok', 'twitter', 'facebook'].map((platform) => (
+              {['instagram', 'tiktok', 'youtube'].map((platform) => (
                 <button
                   key={platform}
                   onClick={() => togglePlatform(platform)}

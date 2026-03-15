@@ -37,6 +37,8 @@ const apiKeyManagementRoutes = require('./routes/apiKeyManagement');
 const bovedaRoutes = require('./routes/boveda');  // Boveda API proxy
 const twinOsRoutes = require('./routes/twinOs');
 const cruciblaRoutes = require('./routes/crucibla');
+
+const APP_ORIGIN = `${process.env.CLIENT_URL || process.env.FRONTEND_URL || process.env.FOLIO_APP_ORIGIN || 'http://localhost:5173'}`.replace(/\/+$/, '');
 const schedulingService = require('./services/schedulingService');
 const convictionLoopService = require('./services/convictionLoopService');
 
@@ -57,6 +59,9 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 const FOLIO_API_URL = process.env.FOLIO_API_URL || 'http://localhost:3001';
 
+// ngrok/TikTok requests arrive through a trusted reverse proxy in local dev.
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: false, // Disabled for local development
@@ -71,7 +76,7 @@ app.use('/api/', limiter);
 
 // CORS
 app.use(cors({
-  origin: process.env.FRONTEND_URL || process.env.FOLIO_APP_ORIGIN || 'http://localhost:5173',
+  origin: APP_ORIGIN,
   credentials: true
 }));
 
@@ -134,7 +139,7 @@ app.use('/folio', createProxyMiddleware({
   secure: false,
   pathRewrite: { '^/folio': '' },
   onProxyRes: (proxyRes) => {
-    proxyRes.headers['Access-Control-Allow-Origin'] = process.env.FRONTEND_URL || 'http://localhost:5173';
+    proxyRes.headers['Access-Control-Allow-Origin'] = APP_ORIGIN;
     proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
   }
 }));

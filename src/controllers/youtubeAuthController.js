@@ -36,11 +36,11 @@ exports.handleCallback = async (req, res) => {
     const { code, state, error } = req.query;
 
     if (error) {
-      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/settings?youtube_error=${error}`);
+      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/connections?youtube_error=${error}`);
     }
 
     if (!code) {
-      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/settings?youtube_error=no_code`);
+      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/connections?youtube_error=no_code`);
     }
 
     // Exchange code for tokens
@@ -56,7 +56,7 @@ exports.handleCallback = async (req, res) => {
     }
 
     if (!userId) {
-      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/settings?youtube_error=no_user`);
+      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/connections?youtube_error=no_user`);
     }
 
     // Get YouTube channel info
@@ -80,13 +80,13 @@ exports.handleCallback = async (req, res) => {
 
     const channel = channelResponse.data.items?.[0];
     if (!channel) {
-      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/settings?youtube_error=no_channel`);
+      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/connections?youtube_error=no_channel`);
     }
 
     // Update user with YouTube credentials
     const user = await User.findById(userId);
     if (!user) {
-      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/settings?youtube_error=user_not_found`);
+      return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/connections?youtube_error=user_not_found`);
     }
 
     // Update socialAccounts
@@ -118,11 +118,11 @@ exports.handleCallback = async (req, res) => {
     console.log(`✅ YouTube connected for user ${user.email}: ${channel.snippet.title}`);
 
     // Redirect back to frontend
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/settings?youtube_success=true`);
+    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/connections?youtube_success=true`);
 
   } catch (error) {
     console.error('YouTube callback error:', error);
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/settings?youtube_error=callback_failed`);
+    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/connections?youtube_error=callback_failed`);
   }
 };
 

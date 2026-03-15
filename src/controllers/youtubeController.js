@@ -24,6 +24,7 @@ const normalizeScheduledDate = (scheduledDate) => {
 };
 
 const VALID_PRIVACY_STATUSES = new Set(['private', 'unlisted', 'public']);
+const VALID_END_SCREEN_TEMPLATES = new Set(['video_subscribe', 'playlist_subscribe', 'series_push', 'none']);
 
 const normalizePrivacyStatus = (privacyStatus) => {
   if (privacyStatus === undefined) {
@@ -31,6 +32,14 @@ const normalizePrivacyStatus = (privacyStatus) => {
   }
 
   return VALID_PRIVACY_STATUSES.has(privacyStatus) ? privacyStatus : null;
+};
+
+const normalizeEndScreenTemplate = (endScreenTemplate) => {
+  if (endScreenTemplate === undefined) {
+    return undefined;
+  }
+
+  return VALID_END_SCREEN_TEMPLATES.has(endScreenTemplate) ? endScreenTemplate : null;
 };
 
 const resolveThumbnailMode = (thumbnailMode, thumbnailUrl = '') => {
@@ -58,6 +67,23 @@ const getThumbnailSourceFilename = (payload = {}) => {
     ? payload.originalFilename.trim()
     : '';
   return original || undefined;
+};
+
+const normalizeFeaturingArtists = (input) => {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  const values = Array.isArray(input)
+    ? input
+    : String(input || '')
+      .split(',');
+
+  return [...new Set(
+    values
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  )].slice(0, 12);
 };
 
 const buildUploadedVideoUrl = (file) => {
@@ -139,7 +165,7 @@ const uploadThumbnailToCloudinary = async (base64Data, userId) => {
 // Create a new collection
 exports.createCollection = async (req, res) => {
   try {
-    const { name, color, tags, folder, position, themePrompt, folderThemePrompt } = req.body;
+    const { name, color, tags, folder, position, themePrompt, folderThemePrompt, descriptionTemplate } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Collection name is required' });
@@ -152,6 +178,7 @@ exports.createCollection = async (req, res) => {
       tags: tags || [],
       themePrompt: themePrompt || '',
       folderThemePrompt: folderThemePrompt || '',
+      descriptionTemplate: typeof descriptionTemplate === 'string' ? descriptionTemplate : undefined,
       folder: folder || null,
       position: position || 0
     });
@@ -257,7 +284,7 @@ exports.updateCollection = async (req, res) => {
     }
 
     // Update allowed fields
-    const allowedUpdates = ['name', 'color', 'tags', 'themePrompt', 'folderThemePrompt', 'rolloutId', 'sectionId', 'folder', 'position', 'cruciblaProjectId', 'cruciblaProjectName', 'cruciblaProjectType', 'cruciblaEra', 'cruciblaAlbum', 'cruciblaAlbumColor'];
+    const allowedUpdates = ['name', 'color', 'tags', 'themePrompt', 'folderThemePrompt', 'descriptionTemplate', 'rolloutId', 'sectionId', 'folder', 'position', 'cruciblaProjectId', 'cruciblaProjectName', 'cruciblaProjectType', 'cruciblaEra', 'cruciblaAlbum', 'cruciblaAlbumColor'];
 
     allowedUpdates.forEach(field => {
       if (updates[field] !== undefined) {
@@ -435,6 +462,8 @@ exports.createVideo = async (req, res) => {
       muxMasterStatus,
       muxMasterAccessExpiresAt,
       artistName,
+      featuringArtists,
+      endScreenTemplate,
     } = req.body;
 
     if (!title || !title.trim()) {
@@ -491,6 +520,11 @@ exports.createVideo = async (req, res) => {
     if (privacyStatus !== undefined && !resolvedPrivacyStatus) {
       return res.status(400).json({ error: 'Invalid privacy status' });
     }
+    const resolvedEndScreenTemplate = normalizeEndScreenTemplate(endScreenTemplate);
+    if (endScreenTemplate !== undefined && !resolvedEndScreenTemplate) {
+      return res.status(400).json({ error: 'Invalid end screen template' });
+    }
+    const resolvedFeaturingArtists = normalizeFeaturingArtists(featuringArtists);
 
     const video = new YoutubeVideo({
       userId: req.user._id,
@@ -503,6 +537,7 @@ exports.createVideo = async (req, res) => {
       collectionId: collectionId || null,
       status: status || 'draft',
       privacyStatus: resolvedPrivacyStatus || 'public',
+      endScreenTemplate: resolvedEndScreenTemplate || 'video_subscribe',
       scheduledDate: resolvedScheduledDate || null,
       position: videoPosition || 0,
       tags: tags || [],
@@ -521,6 +556,7 @@ exports.createVideo = async (req, res) => {
       muxMasterStatus: muxMasterStatus || undefined,
       muxMasterAccessExpiresAt: muxMasterAccessExpiresAt || undefined,
       artistName: artistName || '',
+      featuringArtists: resolvedFeaturingArtists || [],
     });
 
     await video.save();
@@ -844,6 +880,18 @@ exports.updateVideo = async (req, res) => {
       updates.privacyStatus = resolvedPrivacyStatus;
     }
 
+    if (updates.endScreenTemplate !== undefined) {
+      const resolvedEndScreenTemplate = normalizeEndScreenTemplate(updates.endScreenTemplate);
+      if (!resolvedEndScreenTemplate) {
+        return res.status(400).json({ error: 'Invalid end screen template' });
+      }
+      updates.endScreenTemplate = resolvedEndScreenTemplate;
+    }
+
+    if (updates.featuringArtists !== undefined) {
+      updates.featuringArtists = normalizeFeaturingArtists(updates.featuringArtists);
+    }
+
     if (updates.thumbnail !== undefined || updates.thumbnailMode !== undefined || updates.thumbnailStatus !== undefined) {
       const nextThumbnail = updates.thumbnail !== undefined ? updates.thumbnail : video.thumbnail;
       const nextMode = resolveThumbnailMode(updates.thumbnailMode || video.thumbnailMode, nextThumbnail);
@@ -866,6 +914,7 @@ exports.updateVideo = async (req, res) => {
       'collectionId',
       'status',
       'privacyStatus',
+      'endScreenTemplate',
       'scheduledDate',
       'position',
       'tags',
@@ -882,6 +931,7 @@ exports.updateVideo = async (req, res) => {
       'muxMasterStatus',
       'muxMasterAccessExpiresAt',
       'artistName',
+      'featuringArtists',
       'originalFilename',
       'thumbnailSourceFilename',
       'publishedAt',
@@ -1076,7 +1126,9 @@ exports.saveVersion = async (req, res) => {
         thumbnailSourceFilename: v.thumbnailSourceFilename || '',
         position: v.position,
         status: v.status,
-        artistName: v.artistName || ''
+        artistName: v.artistName || '',
+        featuringArtists: v.featuringArtists || [],
+        endScreenTemplate: v.endScreenTemplate || 'video_subscribe',
       }))
     };
 
@@ -1175,7 +1227,9 @@ exports.restoreVersion = async (req, res) => {
           thumbnailSourceFilename: snap.thumbnailSourceFilename || '',
           position: snap.position,
           status: snap.status,
-          artistName: snap.artistName || ''
+          artistName: snap.artistName || '',
+          featuringArtists: snap.featuringArtists || [],
+          endScreenTemplate: snap.endScreenTemplate || 'video_subscribe',
         }
       );
     }

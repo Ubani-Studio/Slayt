@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../stores/useAppStore';
 import { contentApi, gridApi, youtubeApi, reelCollectionApi } from '../lib/api';
 import {
+  ArrowDownWideNarrow,
+  CheckCircle2,
   Upload,
   Search,
   Grid,
@@ -14,7 +16,9 @@ import {
   Plus,
   Loader2,
   RefreshCw,
+  Link2,
   LayoutGrid,
+  Smartphone,
   Youtube,
   Palette,
 } from 'lucide-react';
@@ -22,10 +26,90 @@ import GallerySection from '../components/gallery/GallerySection';
 import GalleryMediaCard from '../components/gallery/GalleryMediaCard';
 import GalleryColorView from '../components/gallery/GalleryColorView';
 
+const MEDIA_SORT_OPTIONS = [
+  { id: 'newest', label: 'Newest' },
+  { id: 'oldest', label: 'Oldest' },
+  { id: 'title', label: 'A-Z' },
+  { id: 'type', label: 'Media Type' },
+  { id: 'portrait', label: 'Portrait First' },
+];
+
+const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'avi', 'mkv', 'webm']);
+
+const getFileExtension = (filename = '') =>
+  filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
+
+const inferFileMediaType = (file) => {
+  const mimeType = file?.type || '';
+  if (mimeType.startsWith('video/')) {
+    return 'video';
+  }
+
+  return VIDEO_EXTENSIONS.has(getFileExtension(file?.name || '')) ? 'video' : 'image';
+};
+
+const getItemTitle = (item) => (item.title || item.caption || 'Untitled').trim().toLowerCase();
+
+const getItemTimestamp = (item) => {
+  const sourceDate = item.createdAt || item.updatedAt || item.scheduledDate || null;
+  const timestamp = sourceDate ? new Date(sourceDate).getTime() : 0;
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const getItemOrientationRank = (item) => {
+  const width = item.metadata?.width || 0;
+  const height = item.metadata?.height || 0;
+
+  if (!width || !height) return 3;
+  if (height > width) return 0;
+  if (width > height) return 1;
+  return 2;
+};
+
+const getItemTypeRank = (item) => {
+  if (item._isYouTube) return 2;
+  if (item.mediaType === 'video') return 1;
+  if (item.mediaType === 'carousel') return 3;
+  return 0;
+};
+
+const compareTitles = (a, b) => getItemTitle(a).localeCompare(getItemTitle(b));
+
+const sortMediaItems = (items, sortMode) => {
+  const sortedItems = [...items];
+
+  sortedItems.sort((a, b) => {
+    if (sortMode === 'oldest') {
+      return getItemTimestamp(a) - getItemTimestamp(b) || compareTitles(a, b);
+    }
+
+    if (sortMode === 'title') {
+      return compareTitles(a, b) || getItemTimestamp(b) - getItemTimestamp(a);
+    }
+
+    if (sortMode === 'type') {
+      return getItemTypeRank(a) - getItemTypeRank(b)
+        || compareTitles(a, b)
+        || getItemTimestamp(b) - getItemTimestamp(a);
+    }
+
+    if (sortMode === 'portrait') {
+      return getItemOrientationRank(a) - getItemOrientationRank(b)
+        || getItemTimestamp(b) - getItemTimestamp(a)
+        || compareTitles(a, b);
+    }
+
+    return getItemTimestamp(b) - getItemTimestamp(a) || compareTitles(a, b);
+  });
+
+  return sortedItems;
+};
+
 function MediaLibrary() {
   const navigate = useNavigate();
   const addToGrid = useAppStore((state) => state.addToGrid);
   const selectPost = useAppStore((state) => state.selectPost);
+  const user = useAppStore((state) => state.user);
 
   // Data sources
   const [content, setContent] = useState([]);
@@ -40,8 +124,12 @@ function MediaLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState([]);
   const [filterType, setFilterType] = useState('all');
+  const [sortMode, setSortMode] = useState('newest');
   const [colorSortMode, setColorSortMode] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState({});
+  const [uploadProgress, setUploadProgress] = useState({ completed: 0, total: 0 });
+  const [clarosaSyncing, setClarosaSyncing] = useState(false);
+  const [clarosaSyncMessage, setClarosaSyncMessage] = useState('');
 
   // Fetch all data sources in parallel
   const fetchAll = useCallback(async () => {
@@ -49,7 +137,7 @@ function MediaLibrary() {
     setError(null);
     try {
       const [contentRes, gridRes, ytRes, reelRes] = await Promise.allSettled([
-        contentApi.getAll(),
+        contentApi.getAll({ limit: 500 }),
         gridApi.getAll(),
         youtubeApi.getVideos(),
         reelCollectionApi.getAll(),
@@ -183,12 +271,12 @@ function MediaLibrary() {
       }));
 
     return {
-      grid: gridItems,
-      reels: reelItems,
-      youtube: ytItems,
-      unsorted,
+      grid: sortMediaItems(gridItems, sortMode),
+      reels: sortMediaItems(reelItems, sortMode),
+      youtube: sortMediaItems(ytItems, sortMode),
+      unsorted: sortMediaItems(unsorted, sortMode),
     };
-  }, [content, youtubeVideos, gridContentIds, reelContentIds, filterItem, searchQuery]);
+  }, [content, youtubeVideos, gridContentIds, reelContentIds, filterItem, searchQuery, sortMode]);
 
   // All items flat (for color view)
   const allFilteredItems = useMemo(
@@ -198,6 +286,16 @@ function MediaLibrary() {
 
   // Total counts
   const totalCount = allFilteredItems.length;
+  const isUploading = uploadProgress.total > 0 && uploadProgress.completed < uploadProgress.total;
+  const clarosaConnected = Boolean(user?.clarosa?.connected);
+  const clarosaMatchedCount = content.filter((item) => item.clarosa?.status === 'matched').length;
+  const summaryChips = [
+    { id: 'all', label: 'All', value: totalCount },
+    { id: 'grid', label: 'Grid', value: sections.grid.length },
+    { id: 'reels', label: 'Reels', value: sections.reels.length },
+    { id: 'youtube', label: 'YouTube', value: sections.youtube.length },
+    { id: 'unsorted', label: 'Unsorted', value: sections.unsorted.length },
+  ];
 
   // Toggle section collapse
   const toggleSection = (key) => {
@@ -249,20 +347,75 @@ function MediaLibrary() {
     navigate('/grid');
   };
 
+  const handleOpenClarosaConnection = useCallback(() => {
+    navigate('/connections');
+  }, [navigate]);
+
+  const handleSyncClarosa = useCallback(async () => {
+    setClarosaSyncing(true);
+    setClarosaSyncMessage('');
+    setError(null);
+
+    try {
+      const result = await contentApi.syncClarosa();
+      const summary = result.summary || {};
+      setClarosaSyncMessage(
+        `Matched ${summary.matched || 0} images. ${summary.skippedWithoutHash || 0} older items still need a stored hash.`,
+      );
+      await fetchAll();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to sync Clarosa insight');
+    } finally {
+      setClarosaSyncing(false);
+    }
+  }, [fetchAll]);
+
   const handleFileUpload = useCallback(
     async (e) => {
       const files = Array.from(e.target.files || []);
-      for (const file of files) {
+      if (files.length === 0) return;
+
+      setError(null);
+      setUploadProgress({ completed: 0, total: files.length });
+
+      const failedUploads = [];
+      let hasSuccessfulUpload = false;
+
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+
         try {
           await contentApi.upload(file, {
             title: file.name,
-            mediaType: file.type.startsWith('video/') ? 'video' : 'image',
+            mediaType: inferFileMediaType(file),
           });
+          hasSuccessfulUpload = true;
         } catch (err) {
+          const reason = err.response?.data?.error || err.message || 'Upload failed';
           console.error('Upload failed:', err);
+          failedUploads.push(`${file.name}: ${reason}`);
+        } finally {
+          setUploadProgress({ completed: index + 1, total: files.length });
         }
       }
-      fetchAll();
+
+      if (hasSuccessfulUpload) {
+        await fetchAll();
+      }
+
+      if (failedUploads.length > 0) {
+        setError(
+          failedUploads.length === 1
+            ? failedUploads[0]
+            : `${failedUploads.length} uploads failed. ${failedUploads[0]}`
+        );
+      }
+
+      setUploadProgress({ completed: 0, total: 0 });
+
+      if (e.target?.value) {
+        e.target.value = '';
+      }
     },
     [fetchAll]
   );
@@ -270,7 +423,7 @@ function MediaLibrary() {
   // Grid classes for card layout
   const gridCols =
     viewMode === 'grid'
-      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4'
+      ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
       : 'space-y-2';
 
   // Render a section's items
@@ -303,106 +456,200 @@ function MediaLibrary() {
   return (
     <div className="h-full flex flex-col">
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search media..."
-              className="w-80 pl-10 pr-4 py-2 input"
-            />
+      <div className="mb-6 rounded-[28px] border border-dark-700/50 bg-dark-900/45 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-sm sm:p-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search media, titles, captions..."
+                className="h-11 w-full rounded-2xl border border-dark-700/60 bg-dark-950/70 pl-10 pr-4 text-sm text-dark-100 outline-none transition-colors placeholder:text-dark-500 focus:border-dark-500"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-dark-700/40 bg-dark-900/35 p-2">
+              <div className="flex items-center gap-1 rounded-xl border border-dark-700/60 bg-dark-950/55 p-1">
+                {[
+                  { id: 'all', label: 'All' },
+                  { id: 'images', label: 'Images', icon: Image },
+                  { id: 'videos', label: 'Videos', icon: Film },
+                ].map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setFilterType(filter.id)}
+                    className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm transition-colors ${
+                      filterType === filter.id
+                        ? 'bg-dark-700 text-dark-100'
+                        : 'text-dark-400 hover:text-dark-200'
+                    }`}
+                  >
+                    {filter.icon && <filter.icon className="h-3.5 w-3.5" />}
+                    <span>{filter.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <label className="flex h-8 items-center gap-2 rounded-xl border border-dark-700/60 bg-dark-950/55 px-3 text-sm text-dark-300">
+                <ArrowDownWideNarrow className="h-3.5 w-3.5 text-dark-400" />
+                <select
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value)}
+                  className="bg-transparent text-sm text-dark-200 outline-none"
+                >
+                  {MEDIA_SORT_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id} className="bg-dark-900 text-dark-100">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1 p-1 bg-dark-800 rounded-lg">
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'images', label: 'Images', icon: Image },
-              { id: 'videos', label: 'Videos', icon: Film },
-            ].map((filter) => (
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-dark-700/40 bg-dark-900/35 p-2">
+            <div className="flex items-center gap-1 rounded-xl border border-dark-700/60 bg-dark-950/55 p-1">
               <button
-                key={filter.id}
-                onClick={() => setFilterType(filter.id)}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1 ${
-                  filterType === filter.id
-                    ? 'bg-dark-600 text-dark-100'
+                onClick={() => setViewMode('grid')}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-dark-700 text-dark-100'
                     : 'text-dark-400 hover:text-dark-200'
                 }`}
               >
-                {filter.icon && <filter.icon className="w-4 h-4" />}
-                {filter.label}
+                <Grid className="h-4 w-4" />
               </button>
-            ))}
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-dark-700 text-dark-100'
+                    : 'text-dark-400 hover:text-dark-200'
+                }`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+
+            <button
+              onClick={() => setColorSortMode((prev) => !prev)}
+              className={`flex h-8 items-center gap-2 rounded-xl border px-3 text-sm transition-colors ${
+                colorSortMode
+                  ? 'border-dark-500 bg-dark-700 text-dark-100'
+                  : 'border-dark-700/60 bg-dark-950/55 text-dark-400 hover:text-dark-200'
+              }`}
+              title="AI Color Sort"
+            >
+              <Palette className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Color</span>
+            </button>
+
+            <button
+              onClick={handleOpenClarosaConnection}
+              className={`flex h-8 items-center gap-2 rounded-xl border px-3 text-sm transition-colors ${
+                clarosaConnected
+                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:text-emerald-200'
+                  : 'border-dark-700/60 bg-dark-950/55 text-dark-300 hover:text-dark-100'
+              }`}
+              title={clarosaConnected ? 'Manage Clarosa link' : 'Link Clarosa'}
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">
+                {clarosaConnected ? 'Clarosa Linked' : 'Link Clarosa'}
+              </span>
+            </button>
+
+            {clarosaConnected && (
+              <button
+                onClick={handleSyncClarosa}
+                disabled={clarosaSyncing || isUploading}
+                className="flex h-8 items-center gap-2 rounded-xl border border-dark-700/60 bg-dark-950/55 px-3 text-sm text-dark-300 transition-colors hover:text-dark-100 disabled:cursor-not-allowed disabled:opacity-60"
+                title="Sync Clarosa insight"
+              >
+                {clarosaSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">{clarosaSyncing ? 'Syncing...' : 'Sync Clarosa'}</span>
+              </button>
+            )}
+
+            <button
+              onClick={fetchAll}
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-dark-700/60 bg-dark-950/55 text-dark-400 transition-colors hover:text-dark-200"
+              title="Refresh"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+
+            <label className={`inline-flex h-10 items-center gap-2 rounded-2xl border px-4 text-sm font-medium transition-colors ${
+              isUploading
+                ? 'cursor-wait border-dark-700/60 bg-dark-200 text-dark-900'
+                : 'cursor-pointer border-white/20 bg-zinc-200 text-dark-900 hover:bg-white'
+            }`}>
+              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <span>{isUploading ? `Uploading ${uploadProgress.completed}/${uploadProgress.total}` : 'Upload'}</span>
+              <input
+                type="file"
+                multiple
+                accept="image/*,video/*,.heic,.heif"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={isUploading}
+              />
+            </label>
           </div>
-
-          {/* Color Sort Toggle */}
-          <button
-            onClick={() => setColorSortMode((prev) => !prev)}
-            className={`p-2 rounded-lg transition-colors ${
-              colorSortMode
-                ? 'bg-dark-600 text-dark-100'
-                : 'text-dark-400 hover:text-dark-200 bg-dark-800'
-            }`}
-            title="AI Color Sort"
-          >
-            <Palette className="w-4 h-4" />
-          </button>
-
-          {/* Refresh */}
-          <button onClick={fetchAll} className="btn-icon" title="Refresh">
-            <RefreshCw className="w-4 h-4" />
-          </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* View Toggle */}
-          <div className="flex items-center gap-1 p-1 bg-dark-800 rounded-lg">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-md ${
-                viewMode === 'grid'
-                  ? 'bg-dark-600 text-dark-100'
-                  : 'text-dark-400 hover:text-dark-200'
-              }`}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {summaryChips.map((chip) => (
+            <span
+              key={chip.id}
+              className="inline-flex items-center gap-2 rounded-full border border-dark-700/50 bg-dark-950/45 px-3 py-1 text-xs text-dark-300"
             >
-              <Grid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-md ${
-                viewMode === 'list'
-                  ? 'bg-dark-600 text-dark-100'
-                  : 'text-dark-400 hover:text-dark-200'
-              }`}
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
+              <span className="text-dark-500">{chip.label}</span>
+              <span className="text-dark-100">{chip.value}</span>
+            </span>
+          ))}
 
-          {/* Upload */}
-          <label className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg cursor-pointer bg-zinc-200 text-dark-900 hover:bg-white transition-colors">
-            <Upload className="w-4 h-4" />
-            Upload
-            <input
-              type="file"
-              multiple
-              accept="image/*,video/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
+          <span className="inline-flex items-center gap-2 rounded-full border border-dark-700/50 bg-dark-950/45 px-3 py-1 text-xs text-dark-300">
+            <Smartphone className="h-3.5 w-3.5 text-dark-400" />
+            <span>Phone-ready uploads</span>
+          </span>
+
+          {clarosaConnected && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-dark-700/50 bg-dark-950/45 px-3 py-1 text-xs text-dark-300">
+              <Link2 className="h-3.5 w-3.5 text-dark-400" />
+              <span>Clarosa {clarosaMatchedCount} matched</span>
+            </span>
+          )}
+
+          {isUploading ? (
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>{uploadProgress.completed} of {uploadProgress.total} processed</span>
+            </span>
+          ) : (
+            totalCount > 0 && (
+              <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-dark-700/50 bg-dark-950/45 px-3 py-1 text-xs text-dark-400">
+                <CheckCircle2 className="h-3.5 w-3.5 text-dark-500" />
+                <span>Sorted {MEDIA_SORT_OPTIONS.find((option) => option.id === sortMode)?.label.toLowerCase()}</span>
+              </span>
+            )
+          )}
         </div>
       </div>
 
       {/* Error State */}
+      {clarosaSyncMessage && !error && (
+        <div className="mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+          {clarosaSyncMessage}
+        </div>
+      )}
+
       {error && (
-        <div className="mb-4 p-4 bg-dark-700/50 border border-dark-600 rounded-lg text-dark-300">
+        <div className="mb-4 rounded-2xl border border-dark-600/70 bg-dark-800/55 px-4 py-3 text-sm text-dark-300">
           {error}
-          <button onClick={fetchAll} className="ml-4 underline">
+          <button onClick={fetchAll} className="ml-4 text-dark-100 underline underline-offset-4">
             Retry
           </button>
         </div>
@@ -442,15 +689,15 @@ function MediaLibrary() {
             <p className="text-sm text-dark-500 mb-4">
               {content.length > 0
                 ? 'Try adjusting your search or filter'
-                : 'Upload images or videos to get started'}
+                : 'Upload images, videos, or phone photos to get started'}
             </p>
-            <label className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg cursor-pointer bg-zinc-200 text-dark-900 hover:bg-white transition-colors">
+            <label className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-zinc-200 px-4 py-2 text-sm font-medium text-dark-900 transition-colors hover:bg-white">
               <Upload className="w-4 h-4" />
               Upload Media
               <input
                 type="file"
                 multiple
-                accept="image/*,video/*"
+                accept="image/*,video/*,.heic,.heif"
                 onChange={handleFileUpload}
                 className="hidden"
               />
@@ -523,17 +770,6 @@ function MediaLibrary() {
         )}
       </div>
 
-      {/* Footer Stats */}
-      <div className="mt-4 flex items-center gap-4 text-sm text-dark-400">
-        <span>{totalCount} items</span>
-        <span>{sections.grid.length} in grid</span>
-        <span>{sections.reels.length} reels</span>
-        <span>{sections.youtube.length} YouTube</span>
-        <span>{sections.unsorted.length} unsorted</span>
-        <span className="ml-auto text-dark-500">
-          Gallery
-        </span>
-      </div>
     </div>
   );
 }

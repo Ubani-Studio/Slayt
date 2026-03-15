@@ -4,6 +4,8 @@ const OAuth2Strategy = require('passport-oauth2').Strategy;
 const axios = require('axios');
 const User = require('../models/User');
 
+const BACKEND_BASE_URL = `${process.env.API_URL || process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 3002}`}`.replace(/\/+$/, '');
+
 // Serialize user for session
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -24,7 +26,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/auth/google/callback'
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || `${BACKEND_BASE_URL}/api/auth/google/callback`
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -80,7 +82,7 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
     tokenURL: 'https://api.instagram.com/oauth/access_token',
     clientID: process.env.INSTAGRAM_CLIENT_ID,
     clientSecret: process.env.INSTAGRAM_CLIENT_SECRET,
-    callbackURL: process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:3000/api/auth/instagram/callback',
+    callbackURL: process.env.INSTAGRAM_REDIRECT_URI || `${BACKEND_BASE_URL}/api/auth/instagram/callback`,
     scope: ['user_profile', 'user_media'],
     passReqToCallback: true
   },

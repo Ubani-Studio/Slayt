@@ -24,6 +24,32 @@ const youtubeCollectionSchema = new mongoose.Schema({
     type: String,
     trim: true
   }],
+  themePrompt: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  folderThemePrompt: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  descriptionTemplate: {
+    type: String,
+    trim: true,
+    default: `{artist} - {title}
+{featuring}
+
+From the {collection} collection.
+
+Listen / follow:
+{links}
+
+Credits:
+{credits}
+
+{cta}`
+  },
   folder: {
     type: String,
     trim: true,
@@ -40,6 +66,11 @@ const youtubeCollectionSchema = new mongoose.Schema({
   },
   sectionId: {
     type: String // References a section within a rollout
+  },
+  scheduleSource: {
+    type: String,
+    enum: ['manual', 'rollout', 'crucibla'],
+    default: 'manual'
   },
   cruciblaProjectId: {
     type: String,
@@ -72,9 +103,15 @@ const youtubeCollectionSchema = new mongoose.Schema({
       videoId: mongoose.Schema.Types.ObjectId,
       title: String,
       description: String,
+      thumbnail: String,
+      thumbnailOriginalUrl: String,
+      originalFilename: String,
+      thumbnailSourceFilename: String,
       position: Number,
       status: String,
-      artistName: String
+      artistName: String,
+      featuringArtists: [String],
+      endScreenTemplate: String
     }]
   }],
   createdAt: {

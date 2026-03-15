@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const { pipeline } = require('stream/promises');
 const { google } = require('googleapis');
 const sharp = require('sharp');
+const { buildYoutubeUploadTitle } = require('../utils/youtubeUploadTitle');
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 const YOUTUBE_UPLOAD_BASE = 'https://www.googleapis.com/upload/youtube/v3';
@@ -180,6 +181,8 @@ async function uploadVideo(user, videoData) {
     const {
       videoUrl,        // URL or file path to video
       title,
+      artistName = '',
+      featuringArtists = [],
       description = '',
       tags = [],
       categoryId = '22', // Default: People & Blogs
@@ -210,10 +213,17 @@ async function uploadVideo(user, videoData) {
       auth: oauth2Client
     });
 
+    const uploadTitle = buildYoutubeUploadTitle({
+      title,
+      artistName,
+      featuringArtists,
+      fallbackTitle: 'Untitled Video',
+    });
+
     // Prepare video metadata
     const videoMetadata = {
       snippet: {
-        title: title.substring(0, 100), // YouTube max 100 chars
+        title: uploadTitle, // YouTube max 100 chars
         description: description.substring(0, 5000), // YouTube max 5000 chars
         tags: tags.slice(0, 500), // YouTube max 500 tags
         categoryId: categoryId
@@ -245,7 +255,7 @@ async function uploadVideo(user, videoData) {
     }
 
     // Upload video
-    console.log('📤 Uploading video to YouTube:', title);
+    console.log('📤 Uploading video to YouTube:', uploadTitle);
     const uploadResponse = await youtube.videos.insert({
       part: ['snippet', 'status'],
       requestBody: videoMetadata,
@@ -276,7 +286,7 @@ async function uploadVideo(user, videoData) {
       success: true,
       videoId,
       videoUrl: youtubeUrl,
-      title: uploadResponse.data.snippet.title,
+      title: uploadResponse.data.snippet.title || uploadTitle,
       publishedAt: uploadResponse.data.snippet.publishedAt,
       privacyStatus: uploadResponse.data.status.privacyStatus,
       thumbnailApplied,

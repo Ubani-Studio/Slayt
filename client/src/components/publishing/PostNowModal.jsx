@@ -6,9 +6,7 @@ import './publishing.css';
 const PLATFORMS = [
   { id: 'instagram', label: 'Instagram', icon: 'IG', color: '#E1306C' },
   { id: 'tiktok', label: 'TikTok', icon: 'TT', color: '#000000' },
-  { id: 'twitter', label: 'Twitter/X', icon: 'X', color: '#1DA1F2' },
   { id: 'youtube', label: 'YouTube', icon: 'YT', color: '#FF0000' },
-  { id: 'pinterest', label: 'Pinterest', icon: 'P', color: '#E60023' },
 ];
 
 function PostNowModal({ isOpen, content, onClose, onPublish }) {

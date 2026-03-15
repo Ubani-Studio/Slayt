@@ -3481,7 +3481,7 @@ function GridPreview({ posts, layout, showRowHandles = true, onDeletePost, gridI
         onDrop={handleVideoDrop}
       >
       {/* Top Bar - Username with Verified Badge (like Instagram) */}
-      <div className="flex items-center justify-between px-4 py-2">
+      <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
         <div className="flex items-center gap-1">
           <span className="text-sm font-semibold text-dark-100">
             {displayData.username}

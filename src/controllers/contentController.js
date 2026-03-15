@@ -5,6 +5,112 @@ const fs = require('fs').promises;
 const cloudinaryService = require('../services/cloudinaryService');
 const { useCloudStorage, uploadDir, thumbnailDir } = require('../middleware/upload');
 const approvalGateService = require('../services/approvalGateService');
+const { computeContentHashFromUpload } = require('../utils/contentHash');
+const {
+  resolveClarosaConnection,
+  lookupSingleContentHash,
+  lookupContentHashes,
+  createClarosaSnapshot,
+  getClarosaErrorMessage,
+} = require('../services/clarosaService');
+
+const PHONE_IMAGE_MIME_TYPES = new Set([
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+]);
+
+const PHONE_IMAGE_EXTENSIONS = new Set(['heic', 'heif']);
+
+const getFileExtension = (filename = '') => path.extname(filename).replace('.', '').toLowerCase();
+
+const isPhoneImageFile = (file = {}) =>
+  PHONE_IMAGE_MIME_TYPES.has(file.mimetype) || PHONE_IMAGE_EXTENSIONS.has(getFileExtension(file.originalname));
+
+const isImageUpload = (file = {}) => (file.mimetype || '').startsWith('image/') || isPhoneImageFile(file);
+
+const isVideoUpload = (file = {}) => (file.mimetype || '').startsWith('video/');
+
+const createHttpError = (message, statusCode = 400) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+const prepareCloudImageUpload = async (file, logLabel = 'content') => {
+  if (isPhoneImageFile(file)) {
+    return {
+      uploadBuffer: file.buffer,
+      uploadOptions: { format: 'jpg' },
+      outputFormat: 'jpg',
+    };
+  }
+
+  let uploadBuffer = file.buffer;
+  const needsCompress = uploadBuffer.length > 9 * 1024 * 1024;
+
+  if (needsCompress) {
+    console.log(`[${logLabel}] Compressing image: ${(uploadBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+  }
+
+  let pipeline = sharp(uploadBuffer).rotate();
+  if (needsCompress) {
+    pipeline = pipeline.resize({ width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true });
+  }
+
+  uploadBuffer = await pipeline
+    .jpeg({ quality: needsCompress ? 85 : 92, mozjpeg: true })
+    .toBuffer();
+
+  if (needsCompress) {
+    console.log(`[${logLabel}] Compressed to: ${(uploadBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+  }
+
+  return {
+    uploadBuffer,
+    uploadOptions: {},
+    outputFormat: 'jpg',
+  };
+};
+
+const resolveClarosaForUpload = async (user, file, isImage) => {
+  if (!isImage) {
+    return { contentHash: null, clarosa: null };
+  }
+
+  let contentHash = null;
+  try {
+    contentHash = await computeContentHashFromUpload(file);
+  } catch (error) {
+    console.error('Content hash computation failed:', error);
+    return { contentHash: null, clarosa: null };
+  }
+
+  const clarosaConnection = resolveClarosaConnection(user);
+
+  if (!clarosaConnection || clarosaConnection.autoSyncOnUpload === false) {
+    return { contentHash, clarosa: null };
+  }
+
+  try {
+    const match = await lookupSingleContentHash(clarosaConnection, contentHash);
+    return {
+      contentHash,
+      clarosa: createClarosaSnapshot(clarosaConnection, contentHash, match),
+    };
+  } catch (error) {
+    return {
+      contentHash,
+      clarosa: createClarosaSnapshot(
+        clarosaConnection,
+        contentHash,
+        null,
+        getClarosaErrorMessage(error),
+      ),
+    };
+  }
+};
 
 // Create new content
 exports.createContent = async (req, res) => {
@@ -14,39 +120,35 @@ exports.createContent = async (req, res) => {
     }
 
     const { title, caption, platform, mediaType } = req.body;
+    const isImage = isImageUpload(req.file);
+    const isVideo = isVideoUpload(req.file);
+
+    if (!isImage && !isVideo) {
+      return res.status(400).json({ error: 'Unsupported media file. Upload an image or video.' });
+    }
 
     let mediaUrl;
     let thumbnailUrl = null;
     let metadata = {};
+    const { contentHash, clarosa } = await resolveClarosaForUpload(req.user, req.file, isImage);
 
     // Check if using cloud storage (Cloudinary)
     if (useCloudStorage()) {
-      // Upload to Cloudinary
-      const isImage = req.file.mimetype.startsWith('image/');
-      const isVideo = req.file.mimetype.startsWith('video/');
-
-      // Normalize all images: fix EXIF orientation + compress if over 9MB
       let uploadBuffer = req.file.buffer;
+      let uploadOptions = {};
+      let normalizedImageFormat = null;
+
       if (isImage) {
-        const needsCompress = uploadBuffer.length > 9 * 1024 * 1024;
-        if (needsCompress) {
-          console.log(`[createContent] Compressing image: ${(uploadBuffer.length / 1024 / 1024).toFixed(1)}MB`);
-        }
-        let pipeline = sharp(uploadBuffer).rotate(); // Auto-orient from EXIF
-        if (needsCompress) {
-          pipeline = pipeline.resize({ width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true });
-        }
-        uploadBuffer = await pipeline
-          .jpeg({ quality: needsCompress ? 85 : 92, mozjpeg: true })
-          .toBuffer();
-        if (needsCompress) {
-          console.log(`[createContent] Compressed to: ${(uploadBuffer.length / 1024 / 1024).toFixed(1)}MB`);
-        }
+        const preparedImage = await prepareCloudImageUpload(req.file, 'createContent');
+        uploadBuffer = preparedImage.uploadBuffer;
+        uploadOptions = preparedImage.uploadOptions;
+        normalizedImageFormat = preparedImage.outputFormat;
       }
 
       const uploadResult = await cloudinaryService.uploadBuffer(uploadBuffer, {
         folder: isVideo ? 'slayt/videos' : 'slayt/images',
         resourceType: isVideo ? 'video' : 'image',
+        ...uploadOptions,
       });
 
       mediaUrl = uploadResult.secure_url;
@@ -65,7 +167,7 @@ exports.createContent = async (req, res) => {
           height: uploadResult.height,
           aspectRatio: `${uploadResult.width}:${uploadResult.height}`,
           fileSize: uploadResult.bytes,
-          format: uploadResult.format,
+          format: normalizedImageFormat || uploadResult.format,
           cloudinaryPublicId: uploadResult.public_id,
         };
       } else if (isVideo) {
@@ -81,11 +183,15 @@ exports.createContent = async (req, res) => {
         };
       }
     } else {
+      if (isPhoneImageFile(req.file)) {
+        throw createHttpError('HEIC and HEIF uploads need cloud storage enabled on this server.');
+      }
+
       // Local storage fallback
       mediaUrl = `/uploads/${req.file.filename}`;
 
       // Generate thumbnail for images
-      if (req.file.mimetype.startsWith('image/')) {
+      if (isImage) {
         const thumbnailFilename = `thumb-${req.file.filename}`;
         const thumbnailPath = path.join(thumbnailDir, thumbnailFilename);
 
@@ -97,7 +203,7 @@ exports.createContent = async (req, res) => {
       }
 
       // Get image metadata
-      if (req.file.mimetype.startsWith('image/')) {
+      if (isImage) {
         const imageMetadata = await sharp(req.file.path).metadata();
         metadata = {
           width: imageMetadata.width,
@@ -116,7 +222,9 @@ exports.createContent = async (req, res) => {
       mediaUrl,
       originalMediaUrl: mediaUrl,
       thumbnailUrl,
-      mediaType: mediaType || 'image',
+      contentHash,
+      clarosa,
+      mediaType: mediaType || (isVideo ? 'video' : 'image'),
       platform: platform || 'instagram',
       metadata
     });
@@ -129,10 +237,13 @@ exports.createContent = async (req, res) => {
     });
   } catch (error) {
     console.error('Create content error:', error);
-    const msg = error.http_code === 400 && error.message?.includes('File size')
+    const statusCode = error.statusCode || error.http_code || 500;
+    const msg = error.message?.includes('HEIC and HEIF uploads')
+      ? error.message
+      : error.http_code === 400 && error.message?.includes('File size')
       ? `Image too large (${(req.file.size / 1024 / 1024).toFixed(1)}MB). Please use a smaller file.`
       : 'Failed to create content';
-    res.status(error.http_code || 500).json({ error: msg });
+    res.status(statusCode).json({ error: msg });
   }
 };
 
@@ -427,16 +538,34 @@ exports.updateMedia = async (req, res) => {
       return res.status(404).json({ error: 'Content not found' });
     }
 
+    const isImage = isImageUpload(mediaFile);
+    const isVideo = isVideoUpload(mediaFile);
+
+    if (!isImage && !isVideo) {
+      return res.status(400).json({ error: 'Unsupported media file. Upload an image or video.' });
+    }
+
     let mediaUrl;
     let thumbnailUrl = content.thumbnailUrl;
+    const { contentHash, clarosa } = await resolveClarosaForUpload(req.user, mediaFile, isImage);
 
     // Check if using cloud storage (Cloudinary)
     if (useCloudStorage()) {
-      // Upload new media to Cloudinary
-      const isImage = mediaFile.mimetype.startsWith('image/');
-      const uploadResult = await cloudinaryService.uploadBuffer(mediaFile.buffer, {
+      let uploadBuffer = mediaFile.buffer;
+      let uploadOptions = {};
+      let normalizedImageFormat = content.metadata?.format;
+
+      if (isImage) {
+        const preparedImage = await prepareCloudImageUpload(mediaFile, 'updateMedia');
+        uploadBuffer = preparedImage.uploadBuffer;
+        uploadOptions = preparedImage.uploadOptions;
+        normalizedImageFormat = preparedImage.outputFormat;
+      }
+
+      const uploadResult = await cloudinaryService.uploadBuffer(uploadBuffer, {
         folder: isImage ? 'slayt/images' : 'slayt/videos',
         resourceType: isImage ? 'image' : 'video',
+        ...uploadOptions,
       });
 
       mediaUrl = uploadResult.secure_url;
@@ -457,13 +586,21 @@ exports.updateMedia = async (req, res) => {
         width: uploadResult.width,
         height: uploadResult.height,
         fileSize: uploadResult.bytes,
+        aspectRatio: uploadResult.width && uploadResult.height
+          ? `${uploadResult.width}:${uploadResult.height}`
+          : content.metadata?.aspectRatio,
+        format: isImage ? (normalizedImageFormat || uploadResult.format) : uploadResult.format,
       };
     } else {
+      if (isPhoneImageFile(mediaFile)) {
+        return res.status(400).json({ error: 'HEIC and HEIF uploads need cloud storage enabled on this server.' });
+      }
+
       // Local storage fallback
       mediaUrl = `/uploads/${mediaFile.filename}`;
 
       // Generate new thumbnail for images
-      if (mediaFile.mimetype.startsWith('image/')) {
+      if (isImage) {
         const thumbnailFilename = `thumb-${mediaFile.filename}`;
         const thumbnailPath = path.join(thumbnailDir, thumbnailFilename);
 
@@ -480,6 +617,8 @@ exports.updateMedia = async (req, res) => {
           width: imageMetadata.width,
           height: imageMetadata.height,
           fileSize: mediaFile.size,
+          aspectRatio: `${imageMetadata.width}:${imageMetadata.height}`,
+          format: imageMetadata.format,
         };
       }
     }
@@ -487,6 +626,9 @@ exports.updateMedia = async (req, res) => {
     // Update content with new media URL
     content.mediaUrl = mediaUrl;
     content.thumbnailUrl = thumbnailUrl;
+    content.mediaType = isVideo ? 'video' : 'image';
+    content.contentHash = contentHash;
+    content.clarosa = clarosa;
 
     // thumbnailOnly: saving a rendered crop (e.g. Instagram 1:1 grid thumbnail)
     // — do NOT reset originalMediaUrl or editSettings
@@ -506,7 +648,90 @@ exports.updateMedia = async (req, res) => {
     });
   } catch (error) {
     console.error('Update media error:', error);
-    res.status(500).json({ error: 'Failed to update media' });
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to update media' });
+  }
+};
+
+exports.syncClarosaInsights = async (req, res) => {
+  try {
+    const clarosaConnection = resolveClarosaConnection(req.user);
+    if (!clarosaConnection) {
+      return res.status(400).json({ error: 'Clarosa is not linked for this account' });
+    }
+
+    const hashedImages = await Content.find({
+      userId: req.userId,
+      mediaType: 'image',
+      contentHash: { $exists: true, $nin: [null, ''] },
+    }).select('_id contentHash');
+
+    const skippedWithoutHash = await Content.countDocuments({
+      userId: req.userId,
+      mediaType: 'image',
+      $or: [
+        { contentHash: { $exists: false } },
+        { contentHash: null },
+        { contentHash: '' },
+      ],
+    });
+
+    if (hashedImages.length === 0) {
+      return res.json({
+        message: 'No hashed images are ready for Clarosa sync yet',
+        summary: {
+          scanned: 0,
+          updated: 0,
+          matched: 0,
+          unmatched: 0,
+          skippedWithoutHash,
+        },
+      });
+    }
+
+    const lookupResults = await lookupContentHashes(
+      clarosaConnection,
+      hashedImages.map((item) => item.contentHash),
+    );
+
+    const operations = [];
+    let matched = 0;
+
+    hashedImages.forEach((item) => {
+      const match = lookupResults[item.contentHash] || null;
+      if (match) {
+        matched += 1;
+      }
+
+      operations.push({
+        updateOne: {
+          filter: { _id: item._id, userId: req.userId },
+          update: {
+            $set: {
+              clarosa: createClarosaSnapshot(clarosaConnection, item.contentHash, match),
+            },
+          },
+        },
+      });
+    });
+
+    if (operations.length > 0) {
+      await Content.bulkWrite(operations);
+    }
+
+    res.json({
+      message: 'Clarosa insights synced',
+      summary: {
+        scanned: hashedImages.length,
+        updated: operations.length,
+        matched,
+        unmatched: operations.length - matched,
+        skippedWithoutHash,
+      },
+    });
+  } catch (error) {
+    const detail = getClarosaErrorMessage(error);
+    console.error('Sync Clarosa insights error:', error);
+    res.status(error.response?.status || 502).json({ error: detail });
   }
 };
 
