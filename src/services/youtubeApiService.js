@@ -24,7 +24,7 @@ function getOAuth2Client() {
   const oauth2Client = new google.auth.OAuth2(
     process.env.YOUTUBE_CLIENT_ID,
     process.env.YOUTUBE_CLIENT_SECRET,
-    process.env.YOUTUBE_REDIRECT_URI || `${process.env.API_URL || 'http://localhost:3030'}/api/auth/youtube/callback`
+    process.env.YOUTUBE_REDIRECT_URI || `${process.env.API_URL || process.env.BACKEND_PUBLIC_URL || 'http://localhost:3002'}/api/auth/youtube/callback`
   );
 
   return oauth2Client;
@@ -47,7 +47,7 @@ function getAuthorizationUrl(state = '') {
     access_type: 'offline',
     scope: scopes,
     state: state,
-    prompt: 'consent' // Force consent to get refresh token
+    prompt: 'consent select_account' // Force refresh token issuance and account chooser for reconnects
   });
 
   return authUrl;
@@ -98,7 +98,7 @@ async function refreshAccessToken(refreshToken) {
  * Validate and refresh YouTube credentials if needed
  */
 async function validateAndRefreshCredentials(user) {
-  const youtube = user.socialMedia?.youtube;
+  const youtube = user.socialAccounts?.youtube || user.socialMedia?.youtube;
 
   if (!youtube?.accessToken) {
     return {
@@ -127,8 +127,16 @@ async function validateAndRefreshCredentials(user) {
       const { accessToken, expiresAt: newExpiresAt } = await refreshAccessToken(youtube.refreshToken);
 
       // Update user's tokens
-      user.socialMedia.youtube.accessToken = accessToken;
-      user.socialMedia.youtube.tokenExpiry = newExpiresAt;
+      if (user.socialAccounts?.youtube) {
+        user.socialAccounts.youtube.accessToken = accessToken;
+        user.socialAccounts.youtube.expiresAt = newExpiresAt;
+        user.socialAccounts.youtube.tokenExpiry = newExpiresAt;
+      }
+
+      if (user.socialMedia?.youtube) {
+        user.socialMedia.youtube.accessToken = accessToken;
+        user.socialMedia.youtube.tokenExpiry = newExpiresAt;
+      }
       await user.save();
 
       return {
@@ -185,6 +193,7 @@ async function uploadVideo(user, videoData) {
     oauth2Client.setCredentials({
       access_token: accessToken,
       refresh_token: user.socialMedia.youtube.refreshToken
+        || user.socialAccounts?.youtube?.refreshToken
     });
 
     // Initialize YouTube API
@@ -353,6 +362,7 @@ async function updateVideoMetadata(user, videoId, updates) {
     oauth2Client.setCredentials({
       access_token: credentialCheck.accessToken,
       refresh_token: user.socialMedia.youtube.refreshToken
+        || user.socialAccounts?.youtube?.refreshToken
     });
 
     const youtube = google.youtube({

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../stores/useAppStore';
-import { platformApi, profileApi, youtubeApi } from '../lib/api';
+import { authApi, platformApi, profileApi, youtubeApi } from '../lib/api';
 import {
   Instagram,
   Youtube,
@@ -105,7 +105,83 @@ const PLATFORMS = [
   },
 ];
 
+const OAUTH_RESULT_PARAMS = [
+  'youtube_success',
+  'youtube_error',
+  'instagram_success',
+  'instagram_error',
+  'tiktok_success',
+  'tiktok_error',
+];
+
+const SWITCHABLE_PLATFORMS = new Set(['instagram', 'tiktok', 'youtube']);
+
+const getOAuthNotice = (params) => {
+  const youtubeError = params.get('youtube_error');
+  if (youtubeError) {
+    if (youtubeError === 'no_channel') {
+      return {
+        type: 'error',
+        message: 'Google auth succeeded, but that Google account does not have a YouTube channel yet. Open YouTube with that account, create a channel, then try again.',
+      };
+    }
+
+    if (youtubeError === 'no_user') {
+      return {
+        type: 'error',
+        message: 'YouTube callback returned, but Slayt could not match it to your logged-in user. Start the connect flow again from this page.',
+      };
+    }
+
+    return {
+      type: 'error',
+      message: `YouTube connection failed (${youtubeError}).`,
+    };
+  }
+
+  if (params.get('youtube_success') === 'true') {
+    return {
+      type: 'success',
+      message: 'YouTube connected successfully.',
+    };
+  }
+
+  const instagramError = params.get('instagram_error');
+  if (instagramError) {
+    return {
+      type: 'error',
+      message: `Instagram connection failed (${instagramError}).`,
+    };
+  }
+
+  if (params.get('instagram_success') === 'true') {
+    return {
+      type: 'success',
+      message: 'Instagram connected successfully.',
+    };
+  }
+
+  const tiktokError = params.get('tiktok_error');
+  if (tiktokError) {
+    return {
+      type: 'error',
+      message: `TikTok connection failed (${tiktokError}).`,
+    };
+  }
+
+  if (params.get('tiktok_success') === 'true') {
+    return {
+      type: 'success',
+      message: 'TikTok connected successfully.',
+    };
+  }
+
+  return null;
+};
+
 function Connections() {
+  const user = useAppStore((state) => state.user);
+  const setUser = useAppStore((state) => state.setUser);
   const connectedPlatforms = useAppStore((state) => state.connectedPlatforms);
   const connectPlatform = useAppStore((state) => state.connectPlatform);
   const disconnectPlatform = useAppStore((state) => state.disconnectPlatform);
@@ -117,8 +193,103 @@ function Connections() {
   const [profileSocialStatus, setProfileSocialStatus] = useState({});
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [showProfileConnections, setShowProfileConnections] = useState(true);
+  const [clarosaBaseUrl, setClarosaBaseUrl] = useState('http://127.0.0.1:8000');
+  const [clarosaWorkspaceId, setClarosaWorkspaceId] = useState('default');
+  const [clarosaSaving, setClarosaSaving] = useState(false);
+  const [clarosaIndexing, setClarosaIndexing] = useState(false);
+  const [clarosaMessage, setClarosaMessage] = useState('');
+  const [clarosaError, setClarosaError] = useState('');
+  const [showClarosaAdvanced, setShowClarosaAdvanced] = useState(false);
+  const [oauthNotice, setOauthNotice] = useState(null);
 
   const currentProfile = profiles.find(p => (p._id || p.id) === currentProfileId);
+  const clarosaConnection = user?.clarosa;
+
+  const applyPlatformConnections = (connections = {}) => {
+    const normalizedConnections = {
+      instagram: {
+        connected: Boolean(connections.instagram?.connected),
+        account: connections.instagram?.username ? { username: connections.instagram.username } : null,
+      },
+      tiktok: {
+        connected: Boolean(connections.tiktok?.connected),
+        account: connections.tiktok?.username ? { username: connections.tiktok.username } : null,
+      },
+      youtube: {
+        connected: Boolean(connections.youtube?.connected),
+        account: connections.youtube?.channelTitle ? { username: connections.youtube.channelTitle } : null,
+      },
+      pinterest: {
+        connected: false,
+        account: null,
+      },
+    };
+
+    Object.entries(normalizedConnections).forEach(([platformId, connection]) => {
+      if (connection.connected) {
+        connectPlatform(platformId, connection.account);
+      } else {
+        disconnectPlatform(platformId);
+      }
+    });
+  };
+
+  const syncAccountConnections = async () => {
+    try {
+      const [connections, youtubeStatus] = await Promise.all([
+        platformApi.getConnections(),
+        youtubeApi.getStatus().catch(() => null),
+      ]);
+
+      applyPlatformConnections({
+        ...connections,
+        youtube: youtubeStatus?.connected
+          ? {
+              connected: true,
+              channelTitle: youtubeStatus.channelTitle || connections.youtube?.channelTitle || null,
+            }
+          : connections.youtube,
+      });
+    } catch (error) {
+      console.error('Failed to sync platform connections:', error);
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hasOauthResult = OAUTH_RESULT_PARAMS.some((key) => params.has(key));
+
+    if (!hasOauthResult) {
+      return;
+    }
+
+    setOauthNotice(getOAuthNotice(params));
+
+    const refreshUser = async () => {
+      try {
+        const me = await authApi.getMe();
+        setUser(me.user || me);
+        await syncAccountConnections();
+      } catch (error) {
+        console.error('Failed to refresh user after OAuth callback:', error);
+      } finally {
+        const nextUrl = new URL(window.location.href);
+        OAUTH_RESULT_PARAMS.forEach((key) => nextUrl.searchParams.delete(key));
+        const nextQuery = nextUrl.searchParams.toString();
+        window.history.replaceState({}, '', `${nextUrl.pathname}${nextQuery ? `?${nextQuery}` : ''}${nextUrl.hash}`);
+      }
+    };
+
+    refreshUser();
+  }, [setUser]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    syncAccountConnections();
+  }, [user]);
 
   // Load social status for current profile
   useEffect(() => {
@@ -139,19 +310,69 @@ function Connections() {
     loadProfileStatus();
   }, [currentProfileId]);
 
+  useEffect(() => {
+    setClarosaBaseUrl(clarosaConnection?.baseUrl || 'http://127.0.0.1:8000');
+    setClarosaWorkspaceId(clarosaConnection?.workspaceId || 'default');
+  }, [clarosaConnection?.baseUrl, clarosaConnection?.workspaceId]);
+
+  useEffect(() => {
+    const platformConnections = {
+      instagram: {
+        connected: Boolean(user?.socialAccounts?.instagram?.connected),
+        account: user?.socialAccounts?.instagram?.username
+          ? { username: user.socialAccounts.instagram.username }
+          : null,
+      },
+      tiktok: {
+        connected: Boolean(user?.socialAccounts?.tiktok?.connected),
+        account: user?.socialAccounts?.tiktok?.username
+          ? { username: user.socialAccounts.tiktok.username }
+          : null,
+      },
+      youtube: {
+        connected: Boolean(user?.socialAccounts?.youtube?.connected || user?.socialMedia?.youtube?.accessToken),
+        account: (user?.socialAccounts?.youtube?.channelTitle || user?.socialMedia?.youtube?.channelTitle)
+          ? { username: user.socialAccounts?.youtube?.channelTitle || user.socialMedia?.youtube?.channelTitle }
+          : null,
+      },
+      pinterest: {
+        connected: false,
+        account: null,
+      },
+    };
+
+    applyPlatformConnections({
+      instagram: {
+        connected: platformConnections.instagram.connected,
+        username: platformConnections.instagram.account?.username || null,
+      },
+      tiktok: {
+        connected: platformConnections.tiktok.connected,
+        username: platformConnections.tiktok.account?.username || null,
+      },
+      youtube: {
+        connected: platformConnections.youtube.connected,
+        channelTitle: platformConnections.youtube.account?.username || null,
+      },
+    });
+  }, [connectPlatform, disconnectPlatform, user]);
+
   const handleConnect = async (platform) => {
     if (platform.comingSoon) return;
 
     setConnecting(platform.id);
     try {
-      // Special handling for YouTube - get auth URL first
+      let authUrl = platform.authUrl;
+
       if (platform.id === 'youtube') {
-        const authUrl = await youtubeApi.getAuthUrl();
-        window.location.href = authUrl;
-      } else {
-        // For other platforms, redirect directly
-        window.location.href = platform.authUrl;
+        authUrl = await youtubeApi.getAuthUrl();
+      } else if (platform.id === 'instagram') {
+        authUrl = await platformApi.getInstagramAuthUrl();
+      } else if (platform.id === 'tiktok') {
+        authUrl = await platformApi.getTikTokAuthUrl();
       }
+
+      window.location.href = authUrl;
     } catch (error) {
       console.error('Connection failed:', error);
       alert(`Failed to connect ${platform.name}: ${error.response?.data?.error || error.message}`);
@@ -160,7 +381,28 @@ function Connections() {
   };
 
   const handleDisconnect = async (platformId) => {
-    disconnectPlatform(platformId);
+    try {
+      setConnecting(platformId);
+
+      if (platformId === 'youtube') {
+        await youtubeApi.disconnect();
+      } else {
+        await platformApi.disconnect(platformId);
+      }
+
+      const me = await authApi.getMe();
+      setUser(me.user || me);
+
+      if (currentProfileId && (platformId === 'instagram' || platformId === 'tiktok')) {
+        const status = await profileApi.getSocialStatus(currentProfileId);
+        setProfileSocialStatus(status);
+      }
+    } catch (error) {
+      console.error('Disconnect failed:', error);
+      alert(`Failed to disconnect ${platformId}. ${error.response?.data?.error || error.message}`);
+    } finally {
+      setConnecting(null);
+    }
   };
 
   const handleRefresh = async (platformId) => {
@@ -168,6 +410,8 @@ function Connections() {
     setRefreshSuccess(null);
     try {
       await platformApi.refreshToken(platformId);
+      const me = await authApi.getMe();
+      setUser(me.user || me);
       setRefreshSuccess(platformId);
       setTimeout(() => setRefreshSuccess(null), 2000);
     } catch (error) {
@@ -176,6 +420,14 @@ function Connections() {
     } finally {
       setRefreshing(null);
     }
+  };
+
+  const getAccountLabel = (platformId, account) => {
+    if (!account?.username) {
+      return null;
+    }
+
+    return platformId === 'youtube' ? account.username : `@${account.username}`;
   };
 
   // Profile-specific connection handlers
@@ -225,49 +477,341 @@ function Connections() {
   const connectedCount = Object.values(connectedPlatforms).filter(
     (p) => p.connected
   ).length;
+  const availableCount = PLATFORMS.filter((platform) => !platform.comingSoon).length;
+  const comingSoonCount = PLATFORMS.filter((platform) => platform.comingSoon).length;
+  const clarosaIndexSummary = clarosaConnection?.lastIndexedSummary;
+
+  const persistClarosaConnection = async ({
+    baseUrl = clarosaBaseUrl,
+    workspaceId = clarosaWorkspaceId,
+    connected = true,
+    successMessage,
+  } = {}) => {
+    setClarosaSaving(true);
+    setClarosaMessage('');
+    setClarosaError('');
+
+    try {
+      const result = await authApi.updateClarosaConnection({
+        baseUrl,
+        workspaceId,
+        connected,
+      });
+      setUser(result.user || user);
+      setClarosaMessage(successMessage || result.message || (connected ? 'Clarosa linked' : 'Clarosa disconnected'));
+    } catch (error) {
+      setClarosaError(error.response?.data?.error || error.message || 'Failed to update Clarosa link');
+    } finally {
+      setClarosaSaving(false);
+    }
+  };
+
+  const handleSaveClarosa = async () => {
+    await persistClarosaConnection({
+      baseUrl: clarosaBaseUrl,
+      workspaceId: clarosaWorkspaceId,
+      connected: true,
+      successMessage: 'Clarosa bridge saved',
+    });
+  };
+
+  const handleQuickLinkClarosa = async () => {
+    const nextBaseUrl = 'http://127.0.0.1:8000';
+    const nextWorkspaceId = clarosaWorkspaceId || 'default';
+    setClarosaBaseUrl(nextBaseUrl);
+    setClarosaWorkspaceId(nextWorkspaceId);
+    await persistClarosaConnection({
+      baseUrl: nextBaseUrl,
+      workspaceId: nextWorkspaceId,
+      connected: true,
+      successMessage: 'Local Clarosa linked',
+    });
+  };
+
+  const handleDisconnectClarosa = async () => {
+    await persistClarosaConnection({
+      connected: false,
+      successMessage: 'Clarosa disconnected',
+    });
+  };
+
+  const handleIndexClarosa = async () => {
+    setClarosaIndexing(true);
+    setClarosaMessage('');
+    setClarosaError('');
+
+    try {
+      const result = await authApi.indexClarosaLibrary();
+      setUser(result.user || user);
+      const indexed = result.result?.indexed ?? 0;
+      const existing = result.result?.existing ?? 0;
+      setClarosaMessage(`Indexed ${indexed} photos. ${existing} already had hashes.`);
+    } catch (error) {
+      setClarosaError(error.response?.data?.error || error.message || 'Failed to index Clarosa library');
+    } finally {
+      setClarosaIndexing(false);
+    }
+  };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-display font-semibold text-dark-100 mb-2 uppercase tracking-widest">
-          Platform Connections
-        </h1>
-        <p className="text-dark-400">
-          Connect your social media accounts to schedule and publish content directly.
-        </p>
+    <div className="mx-auto max-w-4xl space-y-4 pb-6">
+      <div className="rounded-[28px] border border-dark-700/60 bg-dark-900/60 p-4 shadow-[0_18px_56px_rgba(0,0,0,0.24)] sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-xl">
+            <h1 className="text-heading-lg text-[1.85rem] font-semibold tracking-[-0.02em] text-dark-100">
+              Connections
+            </h1>
+            <p className="mt-1 text-sm leading-6 text-dark-400">
+              Manage publishing accounts and the Clarosa bridge from one place.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 sm:min-w-[300px]">
+            {[
+              { label: 'Connected', value: connectedCount },
+              { label: 'Available', value: availableCount },
+              { label: 'Coming soon', value: comingSoonCount },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="flex min-h-[84px] flex-col justify-between rounded-[20px] border border-dark-700/60 bg-dark-950/55 px-3 py-3"
+              >
+                <p className="whitespace-nowrap text-xs text-dark-500">{stat.label}</p>
+                <p className="mt-1 text-2xl font-semibold leading-none tabular-nums text-dark-100">{stat.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-dark-800 rounded-xl border border-dark-700 p-4">
-          <p className="text-3xl font-bold text-dark-100">{connectedCount}</p>
-          <p className="text-sm text-dark-400">Connected</p>
+      {oauthNotice && (
+        <div
+          className={`rounded-[24px] border px-4 py-3 text-sm ${
+            oauthNotice.type === 'error'
+              ? 'border-red-500/30 bg-red-500/10 text-red-100'
+              : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <p>{oauthNotice.message}</p>
+          </div>
         </div>
-        <div className="bg-dark-800 rounded-xl border border-dark-700 p-4">
-          <p className="text-3xl font-bold text-dark-100">
-            {PLATFORMS.length - connectedCount}
-          </p>
-          <p className="text-sm text-dark-400">Available</p>
-        </div>
-        <div className="bg-dark-800 rounded-xl border border-dark-700 p-4">
-          <p className="text-3xl font-bold text-dark-100">
-            {PLATFORMS.filter((p) => p.comingSoon).length}
-          </p>
-          <p className="text-sm text-dark-400">Coming Soon</p>
+      )}
+
+      <div className="rounded-[28px] border border-dark-700/60 bg-dark-900/50 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.18)] sm:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-xl">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-dark-700/70 bg-dark-950/70 text-dark-100">
+                <Link2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-medium text-dark-100">Clarosa</h2>
+              </div>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-dark-400">
+              This is not a social login. Slayt talks directly to a running Clarosa workspace so it can reuse exact image insight without duplicating your photo library.
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+              <span className={`rounded-full border px-3 py-1 ${
+                clarosaConnection?.connected
+                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                  : 'border-dark-700/60 bg-dark-950/50 text-dark-400'
+              }`}>
+                {clarosaConnection?.connected ? `Linked to ${clarosaConnection.workspaceId || 'default'}` : 'Bridge inactive'}
+              </span>
+              <span className="rounded-full border border-dark-700/60 bg-dark-950/50 px-3 py-1 text-dark-400">
+                {clarosaBaseUrl.includes('127.0.0.1') || clarosaBaseUrl.includes('localhost') ? 'Local app' : 'Custom app'}
+              </span>
+              {clarosaConnection?.lastIndexedAt && (
+                <span className="rounded-full border border-dark-700/60 bg-dark-950/50 px-3 py-1 text-dark-400">
+                  Indexed {new Date(clarosaConnection.lastIndexedAt).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid w-full gap-3 xl:max-w-xl">
+            <div className="rounded-[24px] border border-dark-700/60 bg-dark-950/45 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-dark-100">Recommended setup</p>
+                  <p className="mt-1 text-xs leading-5 text-dark-500">
+                    If Clarosa is running on this machine, one click is enough. Only use advanced setup if the app lives elsewhere or you need a non-default workspace.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleQuickLinkClarosa}
+                    disabled={clarosaSaving || clarosaIndexing}
+                    className="btn-primary text-sm py-2"
+                  >
+                    {clarosaSaving ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Linking...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3 h-3" />
+                        Use Local Clarosa
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setShowClarosaAdvanced((current) => !current)}
+                    className="inline-flex items-center gap-2 rounded-full border border-dark-700/60 bg-dark-950/55 px-4 py-2 text-sm text-dark-300 transition-colors hover:text-dark-100"
+                  >
+                    <span>{showClarosaAdvanced ? 'Hide Details' : 'Advanced Setup'}</span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showClarosaAdvanced ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {clarosaConnection?.connected && (
+                    <button
+                      onClick={handleIndexClarosa}
+                      disabled={clarosaSaving || clarosaIndexing}
+                      className="btn-secondary text-sm py-2"
+                    >
+                      {clarosaIndexing ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Indexing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-3 h-3" />
+                          Index Library
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {clarosaConnection?.connected && (
+                    <a
+                      href={clarosaConnection.baseUrl || clarosaBaseUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-dark-700/60 bg-dark-950/55 px-4 py-2 text-sm text-dark-300 transition-colors hover:text-dark-100"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Open App
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {showClarosaAdvanced && (
+              <div className="grid gap-3 rounded-[24px] border border-dark-700/60 bg-dark-950/45 p-4 sm:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-xs text-dark-500">App address</span>
+                  <input
+                    type="text"
+                    value={clarosaBaseUrl}
+                    onChange={(e) => setClarosaBaseUrl(e.target.value)}
+                    placeholder="http://127.0.0.1:8000"
+                    className="h-11 rounded-2xl border border-dark-700/60 bg-dark-950/70 px-4 text-sm text-dark-100 outline-none transition-colors placeholder:text-dark-500 focus:border-dark-500"
+                  />
+                  <span className="text-xs text-dark-500">Use the address where the Clarosa app is running.</span>
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-xs text-dark-500">Workspace key</span>
+                  <input
+                    type="text"
+                    value={clarosaWorkspaceId}
+                    onChange={(e) => setClarosaWorkspaceId(e.target.value)}
+                    placeholder="default"
+                    className="h-11 rounded-2xl border border-dark-700/60 bg-dark-950/70 px-4 text-sm text-dark-100 outline-none transition-colors placeholder:text-dark-500 focus:border-dark-500"
+                  />
+                  <span className="text-xs text-dark-500">Usually `default` unless you keep multiple Clarosa workspaces.</span>
+                </label>
+
+                <div className="sm:col-span-2 flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    onClick={handleSaveClarosa}
+                    disabled={clarosaSaving || clarosaIndexing}
+                    className="btn-secondary text-sm py-2"
+                  >
+                    {clarosaSaving ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3 h-3" />
+                        Save Advanced Link
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleIndexClarosa}
+                    disabled={!clarosaConnection?.connected || clarosaSaving || clarosaIndexing}
+                    className="btn-secondary text-sm py-2"
+                  >
+                    {clarosaIndexing ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Indexing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3 h-3" />
+                        Index Library
+                      </>
+                    )}
+                  </button>
+
+                  {clarosaConnection?.connected && (
+                    <button
+                      onClick={handleDisconnectClarosa}
+                      disabled={clarosaSaving || clarosaIndexing}
+                      className="btn-ghost text-sm py-2 text-dark-300 hover:text-dark-100"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {clarosaIndexSummary && (
+              <div className="rounded-[24px] border border-dark-700/60 bg-dark-950/45 px-4 py-3 text-sm text-dark-300">
+                Indexed {clarosaIndexSummary.indexed || 0} new photos, found {clarosaIndexSummary.existing || 0} already registered, and skipped {clarosaIndexSummary.failed || 0} unavailable files.
+              </div>
+            )}
+
+            {clarosaMessage && (
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                {clarosaMessage}
+              </div>
+            )}
+            {clarosaError && (
+              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+                {clarosaError}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Current Profile Connections */}
       {currentProfile && (
-        <div className="mb-8">
+        <div className="rounded-[28px] border border-dark-700/60 bg-dark-900/50 p-4 shadow-[0_16px_48px_rgba(0,0,0,0.18)]">
           <button
             onClick={() => setShowProfileConnections(!showProfileConnections)}
-            className="w-full flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-700 hover:bg-dark-750 transition-colors"
+            className="w-full flex items-center justify-between rounded-[24px] border border-dark-700/60 bg-dark-950/55 p-4 transition-colors hover:border-dark-600 hover:bg-dark-950/75"
           >
             <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center"
+                className="h-11 w-11 rounded-full flex items-center justify-center border border-white/10"
                 style={{ backgroundColor: currentProfile.color || '#8b5cf6' }}
               >
                 {currentProfile.avatar ? (
@@ -297,16 +841,16 @@ function Connections() {
           </button>
 
           {showProfileConnections && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-2">
               {/* Instagram for Profile */}
-              <div className="bg-dark-800 rounded-xl border border-dark-700 p-5">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-dark-600 flex items-center justify-center flex-shrink-0">
-                    <Instagram className="w-6 h-6 text-white" />
+              <div className="rounded-[20px] border border-dark-700/60 bg-dark-950/35 p-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[14px] bg-dark-600">
+                    <Instagram className="w-4.5 h-4.5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium text-dark-100">Instagram</h3>
+                    <div className="mb-1 flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-dark-100">Instagram</h3>
                       {profileSocialStatus.instagram?.connected && (
                         <span className="badge badge-green">Connected</span>
                       )}
@@ -316,7 +860,7 @@ function Connections() {
                       <Loader2 className="w-4 h-4 animate-spin text-dark-400" />
                     ) : profileSocialStatus.instagram?.connected ? (
                       <>
-                        <p className="text-sm text-dark-400 mb-2">
+                        <p className="mb-2 text-sm leading-5 text-dark-400">
                           {profileSocialStatus.instagram.useParent
                             ? 'Using parent account'
                             : 'Using own account'}
@@ -327,7 +871,7 @@ function Connections() {
                           {profileSocialStatus.instagram.useParent ? (
                             <button
                               onClick={() => handleConnectOwnAccount('instagram')}
-                              className="text-xs text-dark-100 hover:underline"
+                              className="inline-flex h-8 items-center rounded-full border border-dark-700/60 bg-dark-950/55 px-3 text-xs text-dark-200 transition-colors hover:text-white"
                               disabled={connecting === 'instagram'}
                             >
                               {connecting === 'instagram' ? 'Connecting...' : 'Connect own account'}
@@ -335,7 +879,7 @@ function Connections() {
                           ) : (
                             <button
                               onClick={() => handleUseParentConnection('instagram')}
-                              className="text-xs text-dark-400 hover:text-dark-200"
+                              className="inline-flex h-8 items-center rounded-full border border-dark-700/60 bg-dark-950/55 px-3 text-xs text-dark-300 transition-colors hover:text-dark-100"
                               disabled={connecting === 'instagram'}
                             >
                               {connecting === 'instagram' ? 'Switching...' : 'Use parent account'}
@@ -345,10 +889,10 @@ function Connections() {
                       </>
                     ) : (
                       <>
-                        <p className="text-sm text-dark-500 mb-2">Not connected</p>
+                        <p className="mb-2 text-sm text-dark-500">Not connected</p>
                         <button
                           onClick={() => handleUseParentConnection('instagram')}
-                          className="btn-primary text-sm py-1.5"
+                          className="inline-flex h-8 items-center gap-2 rounded-full bg-zinc-200 px-3 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
                           disabled={connecting === 'instagram'}
                         >
                           {connecting === 'instagram' ? (
@@ -370,16 +914,16 @@ function Connections() {
               </div>
 
               {/* TikTok for Profile */}
-              <div className="bg-dark-800 rounded-xl border border-dark-700 p-5">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <div className="rounded-[20px] border border-dark-700/60 bg-dark-950/35 p-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[14px] bg-black">
+                    <svg className="w-4.5 h-4.5 text-white" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z" />
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium text-dark-100">TikTok</h3>
+                    <div className="mb-1 flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-dark-100">TikTok</h3>
                       {profileSocialStatus.tiktok?.connected && (
                         <span className="badge badge-green">Connected</span>
                       )}
@@ -389,7 +933,7 @@ function Connections() {
                       <Loader2 className="w-4 h-4 animate-spin text-dark-400" />
                     ) : profileSocialStatus.tiktok?.connected ? (
                       <>
-                        <p className="text-sm text-dark-400 mb-2">
+                        <p className="mb-2 text-sm leading-5 text-dark-400">
                           {profileSocialStatus.tiktok.useParent
                             ? 'Using parent account'
                             : 'Using own account'}
@@ -400,7 +944,7 @@ function Connections() {
                           {profileSocialStatus.tiktok.useParent ? (
                             <button
                               onClick={() => handleConnectOwnAccount('tiktok')}
-                              className="text-xs text-dark-100 hover:underline"
+                              className="inline-flex h-8 items-center rounded-full border border-dark-700/60 bg-dark-950/55 px-3 text-xs text-dark-200 transition-colors hover:text-white"
                               disabled={connecting === 'tiktok'}
                             >
                               {connecting === 'tiktok' ? 'Connecting...' : 'Connect own account'}
@@ -408,7 +952,7 @@ function Connections() {
                           ) : (
                             <button
                               onClick={() => handleUseParentConnection('tiktok')}
-                              className="text-xs text-dark-400 hover:text-dark-200"
+                              className="inline-flex h-8 items-center rounded-full border border-dark-700/60 bg-dark-950/55 px-3 text-xs text-dark-300 transition-colors hover:text-dark-100"
                               disabled={connecting === 'tiktok'}
                             >
                               {connecting === 'tiktok' ? 'Switching...' : 'Use parent account'}
@@ -418,10 +962,10 @@ function Connections() {
                       </>
                     ) : (
                       <>
-                        <p className="text-sm text-dark-500 mb-2">Not connected</p>
+                        <p className="mb-2 text-sm text-dark-500">Not connected</p>
                         <button
                           onClick={() => handleUseParentConnection('tiktok')}
-                          className="btn-primary text-sm py-1.5"
+                          className="inline-flex h-8 items-center gap-2 rounded-full bg-zinc-200 px-3 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
                           disabled={connecting === 'tiktok'}
                         >
                           {connecting === 'tiktok' ? (
@@ -447,11 +991,10 @@ function Connections() {
       )}
 
       {/* Account-Level Platforms Grid */}
-      <div className="mb-4">
-        <h2 className="text-lg font-medium text-dark-100 mb-1">Account Connections</h2>
-        <p className="text-sm text-dark-400">These connections are shared across all your profiles</p>
+      <div className="pt-1">
+        <h2 className="text-lg font-medium text-dark-100">Publishing accounts</h2>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {PLATFORMS.map((platform) => {
           const connection = connectedPlatforms[platform.id];
           const isConnected = connection?.connected;
@@ -461,21 +1004,21 @@ function Connections() {
           return (
             <div
               key={platform.id}
-              className={`bg-dark-800 rounded-xl border border-dark-700 p-5 transition-all ${
+              className={`rounded-[24px] border border-dark-700/60 bg-dark-900/45 p-4 shadow-[0_10px_32px_rgba(0,0,0,0.12)] transition-all ${
                 platform.comingSoon ? 'opacity-60' : ''
               }`}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3">
                 {/* Platform Icon */}
                 <div
-                  className={`w-12 h-12 rounded-xl ${platform.color} flex items-center justify-center flex-shrink-0`}
+                  className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl ${platform.color}`}
                 >
-                  <Icon className="w-6 h-6 text-white" />
+                  <Icon className="h-5 w-5 text-white" />
                 </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="mb-2 flex items-center gap-2">
                     <h3 className="font-medium text-dark-100">{platform.name}</h3>
                     {isConnected && (
                       <span className="badge badge-green">Connected</span>
@@ -487,17 +1030,17 @@ function Connections() {
 
                   {/* Account Info */}
                   {isConnected && connection.account && (
-                    <p className="text-sm text-dark-400 mb-2">
-                      @{connection.account.username}
+                    <p className="mb-2 break-words text-sm text-dark-400">
+                      {getAccountLabel(platform.id, connection.account)}
                     </p>
                   )}
 
                   {/* Features */}
-                  <div className="flex flex-wrap gap-1 mb-3">
+                  <div className="mb-3 flex flex-wrap gap-1.5">
                     {platform.features.map((feature) => (
                       <span
                         key={feature}
-                        className="text-xs px-2 py-0.5 bg-dark-700 text-dark-400 rounded"
+                        className="rounded-full border border-dark-700/50 bg-dark-950/55 px-2.5 py-1 text-[11px] text-dark-400"
                       >
                         {feature}
                       </span>
@@ -505,9 +1048,28 @@ function Connections() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {isConnected ? (
                       <>
+                        {SWITCHABLE_PLATFORMS.has(platform.id) && (
+                          <button
+                            onClick={() => handleConnect(platform)}
+                            disabled={isConnecting}
+                            className="btn-secondary text-sm py-1.5"
+                          >
+                            {isConnecting ? (
+                              <>
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Switching...
+                              </>
+                            ) : (
+                              <>
+                                <User className="w-3 h-3" />
+                                Switch account
+                              </>
+                            )}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleRefresh(platform.id)}
                           disabled={refreshing === platform.id}
@@ -566,7 +1128,7 @@ function Connections() {
       </div>
 
       {/* Help Section */}
-      <div className="mt-8 p-4 bg-dark-800 rounded-xl border border-dark-700">
+      <div className="rounded-[24px] border border-dark-700/60 bg-dark-900/45 p-4">
         <div className="flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-dark-100 flex-shrink-0 mt-0.5" />
           <div>
