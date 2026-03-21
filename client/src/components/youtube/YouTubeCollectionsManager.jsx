@@ -294,7 +294,7 @@ function YouTubeCollectionsManager({ onSelectCollection, selectedCollectionId, c
       setSelectedFolders(new Set());
       setLastClickedFolder(null);
 
-      console.log(`✅ Deleted ${foldersToDelete.length} folders with ${totalCollections} collections`);
+      console.log(`[ok]Deleted ${foldersToDelete.length} folders with ${totalCollections} collections`);
     } catch (error) {
       console.error('Failed to delete folders:', error);
       alert(`Failed to delete folders: ${error.message || 'Unknown error'}`);
@@ -327,7 +327,7 @@ function YouTubeCollectionsManager({ onSelectCollection, selectedCollectionId, c
       newExpanded.delete(folderName);
       setExpandedFolders(newExpanded);
 
-      console.log(`✅ Deleted folder "${folderName}" with ${count} collections`);
+      console.log(`[ok]Deleted folder "${folderName}" with ${count} collections`);
     } catch (error) {
       console.error('Failed to delete folder:', error);
       alert(`Failed to delete folder: ${error.message || 'Unknown error'}`);
@@ -365,7 +365,7 @@ function YouTubeCollectionsManager({ onSelectCollection, selectedCollectionId, c
     setIsCreatingFolder(false);
     setNewFolderName('');
 
-    console.log('[handleCreateFolder] ✅ Empty folder created (will persist when collection added)');
+    console.log('[handleCreateFolder] [ok]Empty folder created (will persist when collection added)');
   };
 
   const handleDragStart = (e, collection) => {
@@ -402,7 +402,7 @@ function YouTubeCollectionsManager({ onSelectCollection, selectedCollectionId, c
         const newEmptyFolders = new Set(emptyFolders);
         newEmptyFolders.delete(targetFolder);
         setEmptyFolders(newEmptyFolders);
-        console.log(`✅ Folder "${targetFolder}" now has collections, removed from empty folders`);
+        console.log(`[ok]Folder "${targetFolder}" now has collections, removed from empty folders`);
       }
 
       setDraggedCollection(null);
@@ -485,7 +485,7 @@ function YouTubeCollectionsManager({ onSelectCollection, selectedCollectionId, c
         }
       }
 
-      console.log(`✅ Reordered collections in folder "${draggedFolder}"`);
+      console.log(`[ok]Reordered collections in folder "${draggedFolder}"`);
       setDraggedCollection(null);
     } catch (error) {
       console.error('Failed to reorder collections:', error);
@@ -517,7 +517,7 @@ function YouTubeCollectionsManager({ onSelectCollection, selectedCollectionId, c
     try {
       await youtubeApi.deleteCollection(collectionId);
       deleteYoutubeCollection(collectionId);
-      console.log(`✅ Deleted collection "${collectionName}"`);
+      console.log(`[ok]Deleted collection "${collectionName}"`);
     } catch (error) {
       console.error('Failed to delete collection:', error);
       alert(`Failed to delete collection: ${error.message || 'Unknown error'}`);
@@ -560,7 +560,7 @@ function YouTubeCollectionsManager({ onSelectCollection, selectedCollectionId, c
           <FolderInput className="w-3.5 h-3.5" />
         </button>
         {isOpen && (
-          <div className="absolute left-0 top-full mt-1 w-44 max-h-48 overflow-y-auto bg-dark-800 border border-dark-600 rounded-lg shadow-xl z-50">
+          <div className="absolute left-0 top-full mt-1 w-44 max-h-48 overflow-y-auto bg-dark-800 border border-dark-600 shadow-xl z-50">
             {folders.map(folder => {
               if (folder === currentFolder) return null;
               return (

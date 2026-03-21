@@ -21,10 +21,10 @@ const ConvictionBadge = ({
 
     if (score >= 70) {
       return {
-        bg: 'bg-accent-purple',
+        bg: 'bg-dark-100',
         text: 'text-white',
-        ring: 'ring-accent-purple',
-        shadow: 'shadow-accent-purple/50'
+        ring: 'ring-dark-300',
+        shadow: 'shadow-dark-300/30'
       };
     } else if (score >= 50) {
       return {

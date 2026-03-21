@@ -4,17 +4,6 @@ import { useAppStore } from '../stores/useAppStore';
 import { authApi } from '../lib/api';
 import {
   User,
-  Bell,
-  Palette,
-  Clock,
-  Shield,
-  Download,
-  Trash2,
-  Moon,
-  Sun,
-  Save,
-  Key,
-  Globe,
   X,
   Check,
   Upload,
@@ -25,16 +14,12 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
-// Remap zoom: slider value to actual scale (quadratic for zoom > 1)
-const getActualZoom = (val) => val <= 1 ? val : val * val;
-
 const TABS = [
-  { id: 'profile', label: 'Profile', icon: User },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'scheduling', label: 'Scheduling', icon: Clock },
-  { id: 'security', label: 'Security', icon: Shield },
-  { id: 'data', label: 'Data & Export', icon: Download },
+  { id: 'profile', label: 'Profile' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'scheduling', label: 'Scheduling' },
+  { id: 'security', label: 'Security' },
+  { id: 'data', label: 'Data & Export' },
 ];
 
 const TIMEZONES = [
@@ -58,8 +43,6 @@ const FAKE_SESSIONS = [
 
 function Settings() {
   const navigate = useNavigate();
-  const theme = useAppStore((state) => state.theme);
-  const toggleTheme = useAppStore((state) => state.toggleTheme);
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
   const logout = useAppStore((state) => state.logout);
@@ -71,14 +54,14 @@ function Settings() {
     email: user?.email || '',
     bio: user?.bio || '',
     brandName: user?.brandName || '',
-    timezone: 'America/New_York',
-    defaultPostTime: '09:00',
-    autoSaveDrafts: true,
+    timezone: user?.timezone || 'America/New_York',
+    defaultPostTime: user?.defaultPostTime || '09:00',
+    autoSaveDrafts: user?.autoSaveDrafts ?? true,
     notifications: {
-      email: true,
-      push: true,
-      postReminders: true,
-      weeklyReport: false,
+      email: user?.notifications?.email ?? true,
+      push: user?.notifications?.push ?? true,
+      postReminders: user?.notifications?.postReminders ?? true,
+      weeklyReport: user?.notifications?.weeklyReport ?? false,
     },
   });
 
@@ -115,6 +98,15 @@ function Settings() {
         email: user.email || prev.email,
         bio: user.bio || prev.bio,
         brandName: user.brandName || prev.brandName,
+        timezone: user.timezone || prev.timezone,
+        defaultPostTime: user.defaultPostTime || prev.defaultPostTime,
+        autoSaveDrafts: user.autoSaveDrafts ?? prev.autoSaveDrafts,
+        notifications: {
+          email: user.notifications?.email ?? prev.notifications.email,
+          push: user.notifications?.push ?? prev.notifications.push,
+          postReminders: user.notifications?.postReminders ?? prev.notifications.postReminders,
+          weeklyReport: user.notifications?.weeklyReport ?? prev.notifications.weeklyReport,
+        },
       }));
       setAvatarPreview(user.avatar || null);
       setAvatarFile(null);
@@ -168,6 +160,10 @@ function Settings() {
         avatar: avatarPreview,
         avatarPosition: nextAvatarPosition,
         avatarZoom: nextAvatarZoom,
+        timezone: formData.timezone,
+        defaultPostTime: formData.defaultPostTime,
+        autoSaveDrafts: formData.autoSaveDrafts,
+        notifications: formData.notifications,
       };
 
       // Try to save to backend if authenticated
@@ -272,18 +268,12 @@ function Settings() {
     alert(`Session ${sessionId} has been logged out`);
   };
 
-  const previewAvatarPosition = avatarChanged ? { x: 0, y: 0 } : (user?.avatarPosition || { x: 0, y: 0 });
-  const previewAvatarZoom = avatarChanged ? 1 : (user?.avatarZoom || 1);
-
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-display font-semibold text-dark-100 mb-2 uppercase tracking-widest">
+      <div className="mb-6">
+        <div className="text-lg font-sans font-medium text-dark-100 tracking-tight">
           Settings
-        </h1>
-        <p className="text-dark-400">
-          Manage your account preferences and application settings.
-        </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">
@@ -294,46 +284,36 @@ function Settings() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                className={`w-full px-3 py-2 text-left text-sm transition-colors ${
                   activeTab === tab.id
                     ? 'bg-dark-700 text-dark-100'
-                    : 'text-dark-300 hover:bg-dark-700 hover:text-dark-100'
+                    : 'text-dark-400 hover:bg-dark-700/50 hover:text-dark-200'
                 }`}
               >
-                <tab.icon className="w-4 h-4" />
-                <span className="text-sm">{tab.label}</span>
+                {tab.label}
               </button>
             ))}
           </nav>
         </div>
 
         {/* Content */}
-        <div className="min-w-0 flex-1 bg-dark-800 rounded-2xl border border-dark-700 p-5 sm:p-6">
+        <div className="min-w-0 flex-1 bg-dark-800 border border-dark-700 p-5 sm:p-6">
           {/* Profile */}
           {activeTab === 'profile' && (
             <div className="space-y-6">
               <h2 className="text-lg font-medium text-dark-100">Profile Settings</h2>
 
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-full bg-dark-600 overflow-hidden relative">
+                <div className="w-20 h-20 rounded-full bg-dark-800 overflow-hidden">
                   {avatarPreview ? (
                     <img
                       src={avatarPreview}
                       alt="Avatar"
-                      className="absolute pointer-events-none"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        left: '50%',
-                        top: '50%',
-                        transformOrigin: 'center center',
-                        transform: `translate(-50%, -50%) translate(${previewAvatarPosition.x * 0.3}px, ${previewAvatarPosition.y * 0.3}px) scale(${getActualZoom(previewAvatarZoom)})`,
-                      }}
+                      className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <User className="w-8 h-8 text-white" />
+                      <User className="w-8 h-8 text-dark-400" />
                     </div>
                   )}
                 </div>
@@ -403,55 +383,6 @@ function Settings() {
             </div>
           )}
 
-          {/* Appearance */}
-          {activeTab === 'appearance' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-medium text-dark-100">Appearance</h2>
-
-              <div>
-                <label className="input-label mb-3">Theme</label>
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => theme !== 'dark' && toggleTheme()}
-                    className={`flex-1 p-4 rounded-xl border-2 transition-colors ${
-                      theme === 'dark'
-                        ? 'border-dark-100 bg-dark-700'
-                        : 'border-dark-600 hover:border-dark-500'
-                    }`}
-                  >
-                    <Moon className="w-6 h-6 text-dark-200 mx-auto mb-2" />
-                    <p className="text-sm text-dark-200">Dark</p>
-                  </button>
-                  <button
-                    onClick={() => theme !== 'light' && toggleTheme()}
-                    className={`flex-1 p-4 rounded-xl border-2 transition-colors ${
-                      theme === 'light'
-                        ? 'border-dark-100 bg-dark-700'
-                        : 'border-dark-600 hover:border-dark-500'
-                    }`}
-                  >
-                    <Sun className="w-6 h-6 text-dark-200 mx-auto mb-2" />
-                    <p className="text-sm text-dark-200">Light</p>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="input-label">Accent Color</label>
-                <div className="flex gap-2 mt-2">
-                  {['#8b5cf6', '#3b82f6', '#10b981', '#f97316', '#ec4899'].map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => alert(`Accent color changed to ${color}`)}
-                      className="w-8 h-8 rounded-full border-2 border-transparent hover:border-white/50 hover:scale-110 transition-transform"
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Notifications */}
           {activeTab === 'notifications' && (
             <div className="space-y-6">
@@ -479,13 +410,13 @@ function Settings() {
                           },
                         })
                       }
-                      className={`w-12 h-6 rounded-full transition-colors ${
-                        formData.notifications[item.key] ? 'bg-dark-100' : 'bg-dark-600'
+                      className={`w-8 h-4 rounded-full transition-colors ${
+                        formData.notifications[item.key] ? 'bg-dark-300' : 'bg-dark-600'
                       }`}
                     >
                       <div
-                        className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                          formData.notifications[item.key] ? 'translate-x-6' : 'translate-x-0.5'
+                        className={`w-3 h-3 rounded-full bg-white transition-transform ${
+                          formData.notifications[item.key] ? 'translate-x-4' : 'translate-x-0.5'
                         }`}
                       />
                     </button>
@@ -497,50 +428,48 @@ function Settings() {
 
           {/* Scheduling */}
           {activeTab === 'scheduling' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-medium text-dark-100">Scheduling Preferences</h2>
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium text-dark-100">Scheduling</h2>
 
-              <div>
-                <label className="input-label">Timezone</label>
-                <select
-                  value={formData.timezone}
-                  onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                  className="input"
-                >
-                  {TIMEZONES.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="input-label">Default Post Time</label>
-                <input
-                  type="time"
-                  value={formData.defaultPostTime}
-                  onChange={(e) => setFormData({ ...formData, defaultPostTime: e.target.value })}
-                  className="input"
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-4">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-dark-200">Auto-save Drafts</p>
-                  <p className="text-sm text-dark-500">Automatically save your work</p>
+                  <label className="input-label">Timezone</label>
+                  <select
+                    value={formData.timezone}
+                    onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                    className="input"
+                  >
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {tz}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+                <div>
+                  <label className="input-label">Default Post Time</label>
+                  <input
+                    type="time"
+                    value={formData.defaultPostTime}
+                    onChange={(e) => setFormData({ ...formData, defaultPostTime: e.target.value })}
+                    className="input"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-dark-200">Auto-save drafts</p>
                 <button
                   onClick={() =>
                     setFormData({ ...formData, autoSaveDrafts: !formData.autoSaveDrafts })
                   }
-                  className={`w-12 h-6 rounded-full transition-colors ${
-                    formData.autoSaveDrafts ? 'bg-dark-100' : 'bg-dark-600'
+                  className={`w-8 h-4 rounded-full transition-colors ${
+                    formData.autoSaveDrafts ? 'bg-dark-300' : 'bg-dark-600'
                   }`}
                 >
                   <div
-                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                      formData.autoSaveDrafts ? 'translate-x-6' : 'translate-x-0.5'
+                    className={`w-3 h-3 rounded-full bg-white transition-transform ${
+                      formData.autoSaveDrafts ? 'translate-x-4' : 'translate-x-0.5'
                     }`}
                   />
                 </button>
@@ -553,44 +482,35 @@ function Settings() {
             <div className="space-y-6">
               <h2 className="text-lg font-medium text-dark-100">Security</h2>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <button
                   onClick={() => setShowPasswordModal(true)}
-                  className="w-full flex items-center justify-between p-4 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
+                  className="w-full flex items-center justify-between p-4 bg-dark-700 hover:bg-dark-600 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <Key className="w-5 h-5 text-dark-400" />
-                    <div className="text-left">
-                      <p className="text-dark-200">Change Password</p>
-                      <p className="text-sm text-dark-500">Update your password</p>
-                    </div>
+                  <div className="text-left">
+                    <p className="text-sm text-dark-200">Change Password</p>
+                    <p className="text-xs text-dark-500 mt-0.5">Update your password</p>
                   </div>
                 </button>
 
                 <button
                   onClick={() => setShow2FAModal(true)}
-                  className="w-full flex items-center justify-between p-4 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
+                  className="w-full flex items-center justify-between p-4 bg-dark-700 hover:bg-dark-600 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <Shield className="w-5 h-5 text-dark-400" />
-                    <div className="text-left">
-                      <p className="text-dark-200">Two-Factor Authentication</p>
-                      <p className="text-sm text-dark-500">Add extra security to your account</p>
-                    </div>
+                  <div className="text-left">
+                    <p className="text-sm text-dark-200">Two-Factor Authentication</p>
+                    <p className="text-xs text-dark-500 mt-0.5">Add extra security to your account</p>
                   </div>
-                  <span className="badge badge-orange">Off</span>
+                  <span className="text-xs text-dark-500">Off</span>
                 </button>
 
                 <button
                   onClick={() => setShowSessionsModal(true)}
-                  className="w-full flex items-center justify-between p-4 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
+                  className="w-full flex items-center justify-between p-4 bg-dark-700 hover:bg-dark-600 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <Globe className="w-5 h-5 text-dark-400" />
-                    <div className="text-left">
-                      <p className="text-dark-200">Active Sessions</p>
-                      <p className="text-sm text-dark-500">Manage your logged-in devices</p>
-                    </div>
+                  <div className="text-left">
+                    <p className="text-sm text-dark-200">Active Sessions</p>
+                    <p className="text-xs text-dark-500 mt-0.5">Manage your logged-in devices</p>
                   </div>
                 </button>
               </div>
@@ -602,30 +522,24 @@ function Settings() {
             <div className="space-y-6">
               <h2 className="text-lg font-medium text-dark-100">Data & Export</h2>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <button
                   onClick={handleExportData}
-                  className="w-full flex items-center justify-between p-4 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
+                  className="w-full flex items-center justify-between p-4 bg-dark-700 hover:bg-dark-600 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <Download className="w-5 h-5 text-dark-400" />
-                    <div className="text-left">
-                      <p className="text-dark-200">Export All Data</p>
-                      <p className="text-sm text-dark-500">Download all your content and settings</p>
-                    </div>
+                  <div className="text-left">
+                    <p className="text-sm text-dark-200">Export All Data</p>
+                    <p className="text-xs text-dark-500 mt-0.5">Download all your content and settings</p>
                   </div>
                 </button>
 
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  className="w-full flex items-center justify-between p-4 bg-dark-700/50 rounded-lg hover:bg-dark-700/30 transition-colors border border-dark-600"
+                  className="w-full flex items-center justify-between p-4 bg-dark-700/50 hover:bg-dark-700/30 transition-colors border border-dark-600"
                 >
-                  <div className="flex items-center gap-3">
-                    <Trash2 className="w-5 h-5 text-dark-300" />
-                    <div className="text-left">
-                      <p className="text-dark-300">Delete Account</p>
-                      <p className="text-sm text-dark-300/70">Permanently delete your account and data</p>
-                    </div>
+                  <div className="text-left">
+                    <p className="text-sm text-dark-300">Delete Account</p>
+                    <p className="text-xs text-dark-300/70 mt-0.5">Permanently delete your account and data</p>
                   </div>
                 </button>
               </div>
@@ -654,9 +568,8 @@ function Settings() {
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4" />
                   Save Changes
-                </>
+</>
               )}
             </button>
           </div>
@@ -666,7 +579,7 @@ function Settings() {
       {/* Change Password Modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowPasswordModal(false)}>
-          <div className="bg-dark-800 rounded-2xl p-6 w-full max-w-md border border-dark-700" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-dark-800 p-6 w-full max-w-md border border-dark-700" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-dark-100">Change Password</h3>
               <button onClick={() => setShowPasswordModal(false)} className="text-dark-400 hover:text-dark-200">
@@ -751,7 +664,7 @@ function Settings() {
       {/* 2FA Modal */}
       {show2FAModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShow2FAModal(false)}>
-          <div className="bg-dark-800 rounded-2xl p-6 w-full max-w-md border border-dark-700" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-dark-800 p-6 w-full max-w-md border border-dark-700" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-dark-100">Two-Factor Authentication</h3>
               <button onClick={() => setShow2FAModal(false)} className="text-dark-400 hover:text-dark-200">
@@ -760,9 +673,6 @@ function Settings() {
             </div>
 
             <div className="text-center py-6">
-              <div className="w-16 h-16 rounded-full bg-dark-700 flex items-center justify-center mx-auto mb-4">
-                <Smartphone className="w-8 h-8 text-dark-100" />
-              </div>
               <h4 className="text-dark-100 font-medium mb-2">Secure Your Account</h4>
               <p className="text-dark-400 text-sm mb-4">
                 Two-factor authentication adds an extra layer of security by requiring a code from your phone in addition to your password.
@@ -781,7 +691,7 @@ function Settings() {
       {/* Active Sessions Modal */}
       {showSessionsModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowSessionsModal(false)}>
-          <div className="bg-dark-800 rounded-2xl p-6 w-full max-w-lg border border-dark-700" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-dark-800 p-6 w-full max-w-lg border border-dark-700" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-dark-100">Active Sessions</h3>
               <button onClick={() => setShowSessionsModal(false)} className="text-dark-400 hover:text-dark-200">
@@ -791,7 +701,7 @@ function Settings() {
 
             <div className="space-y-3">
               {FAKE_SESSIONS.map((session) => (
-                <div key={session.id} className="flex items-center justify-between p-3 bg-dark-700 rounded-lg">
+                <div key={session.id} className="flex items-center justify-between p-3 bg-dark-700">
                   <div className="flex items-center gap-3">
                     {session.device.includes('iPhone') ? (
                       <Smartphone className="w-5 h-5 text-dark-400" />
@@ -833,11 +743,8 @@ function Settings() {
       {/* Delete Account Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-dark-800 rounded-2xl p-6 w-full max-w-md border border-dark-700" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-dark-600/30 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-dark-300" />
-              </div>
+          <div className="bg-dark-800 p-6 w-full max-w-md border border-dark-700" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4">
               <h3 className="text-lg font-medium text-dark-100">Delete Account</h3>
             </div>
 
@@ -851,7 +758,7 @@ function Settings() {
               </button>
               <button
                 onClick={handleDeleteAccount}
-                className="flex-1 px-4 py-2 bg-dark-600/30 text-dark-300 rounded-lg hover:bg-dark-600/40 transition-colors"
+                className="flex-1 px-4 py-2 bg-dark-600/30 text-dark-300 hover:bg-dark-600/40 transition-colors"
               >
                 Delete Account
               </button>

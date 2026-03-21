@@ -3,19 +3,9 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../stores/useAppStore';
 import ProfileSwitcher from '../profile/ProfileSwitcher';
 import {
-  LayoutGrid,
-  FolderOpen,
-  Link2,
-  Settings,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  Youtube,
-  Layers,
-  Users,
-  CalendarDays as CalendarIcon,
-  TrendingUp,
-  Ellipsis,
 } from 'lucide-react';
 
 const navSections = [
@@ -23,33 +13,32 @@ const navSections = [
     id: 'plan',
     label: 'Plan',
     items: [
-      { path: '/grid', icon: LayoutGrid, label: 'Grid' },
-      { path: '/youtube', icon: Youtube, label: 'YouTube' },
-      { path: '/calendar', icon: CalendarIcon, label: 'Calendar' },
-      { path: '/rollout', icon: Layers, label: 'Rollout' },
+      { path: '/grid', label: 'Grid' },
+      { path: '/youtube', label: 'YouTube' },
+      { path: '/calendar', label: 'Calendar' },
+      { path: '/rollout', label: 'Rollout' },
     ],
   },
   {
     id: 'create',
     label: 'Create',
     items: [
-      { path: '/library', icon: FolderOpen, label: 'Library' },
+      { path: '/library', label: 'Library' },
     ],
   },
   {
     id: 'system',
     label: 'System',
     items: [
-      { path: '/settings', icon: Settings, label: 'Settings' },
+      { path: '/settings', label: 'Settings' },
       {
         id: 'more',
-        icon: Ellipsis,
         label: 'More',
         children: [
-          { path: '/learning', icon: TrendingUp, label: 'Learning' },
-          { path: '/studio', icon: FolderOpen, label: 'Folio' },
-          { path: '/profiles', icon: Users, label: 'Profiles' },
-          { path: '/connections', icon: Link2, label: 'Connections' },
+          { path: '/learning', label: 'Learning' },
+          { path: '/studio', label: 'Folio' },
+          { path: '/profiles', label: 'Profiles' },
+          { path: '/connections', label: 'Connections' },
         ],
       },
     ],
@@ -71,8 +60,6 @@ function NavItem({ item, collapsed }) {
     ? item.children.some(child => location.pathname === child.path)
     : location.pathname === item.path;
 
-  const Icon = item.icon;
-
   // Simple nav item (no children)
   if (!item.children) {
     return (
@@ -80,16 +67,17 @@ function NavItem({ item, collapsed }) {
         <NavLink
           to={item.path}
           className={({ isActive }) =>
-            `h-8 flex items-center ${Icon ? 'gap-2' : ''} px-2.5 transition-colors ${
+            `h-8 flex items-center px-2.5 transition-colors ${
               isActive
                 ? 'text-dark-100 font-medium'
                 : 'text-dark-400 hover:text-dark-200'
-            } ${collapsed ? 'justify-center' : ''} ${!Icon && !collapsed ? 'pl-3.5' : ''}`
+            } ${collapsed ? 'justify-center' : ''}`
           }
           title={collapsed ? item.label : undefined}
         >
-          {Icon ? <Icon className="w-4 h-4 flex-shrink-0" /> : null}
-          {!collapsed && (
+          {collapsed ? (
+            <span className="text-xs font-medium">{item.label.charAt(0)}</span>
+          ) : (
             <span className="text-sm">{item.label}</span>
           )}
         </NavLink>
@@ -110,12 +98,13 @@ function NavItem({ item, collapsed }) {
           isActive
             ? 'text-dark-100 font-medium'
             : 'text-dark-400 hover:text-dark-200'
-        } ${collapsed ? 'justify-center' : ''} ${!Icon && !collapsed ? 'pl-3.5' : ''}`}
+        } ${collapsed ? 'justify-center' : ''}`}
         title={collapsed ? item.label : undefined}
         type="button"
       >
-        {Icon ? <Icon className="w-4 h-4 flex-shrink-0" /> : null}
-        {!collapsed && (
+        {collapsed ? (
+          <span className="text-xs font-medium">{item.label.charAt(0)}</span>
+        ) : (
           <>
             <span className="text-sm flex-1 text-left">{item.label}</span>
             <ChevronDown
@@ -133,14 +122,13 @@ function NavItem({ item, collapsed }) {
               <NavLink
                 to={child.path}
                 className={({ isActive }) =>
-                  `h-8 flex items-center ${child.icon ? 'gap-2' : ''} px-2.5 transition-colors text-sm ${
+                  `h-8 flex items-center px-2.5 transition-colors text-sm ${
                     isActive
                       ? 'text-dark-100 font-medium'
                       : 'text-dark-500 hover:text-dark-200'
-                  } ${!child.icon ? 'pl-3.5' : ''}`
+                  }`
                 }
               >
-                {child.icon ? <child.icon className="w-3.5 h-3.5" /> : null}
                 <span>{child.label}</span>
               </NavLink>
             </li>
@@ -185,13 +173,8 @@ function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto">
         <div className="px-2 space-y-3">
-          {navSections.map((section) => (
-            <div key={section.id}>
-              {!sidebarCollapsed && (
-                <div className="px-2 pb-1">
-                  <span className="micro-label text-dark-600">{section.label}</span>
-                </div>
-              )}
+          {navSections.map((section, i) => (
+            <div key={section.id} className={i > 0 ? 'pt-2 mt-2 border-t border-dark-700/50' : ''}>
               <ul className="space-y-0.5">
                 {section.items.map((item) => (
                   <NavItem

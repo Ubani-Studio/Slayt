@@ -3,24 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../stores/useAppStore';
 import { contentApi, gridApi, youtubeApi, reelCollectionApi } from '../lib/api';
 import {
-  ArrowDownWideNarrow,
-  CheckCircle2,
-  Upload,
-  Search,
   Grid,
   List,
-  Image,
-  Film,
-  FolderOpen,
-  Trash2,
-  Plus,
   Loader2,
   RefreshCw,
-  Link2,
-  LayoutGrid,
-  Smartphone,
-  Youtube,
-  Palette,
 } from 'lucide-react';
 import GallerySection from '../components/gallery/GallerySection';
 import GalleryMediaCard from '../components/gallery/GalleryMediaCard';
@@ -455,199 +441,136 @@ function MediaLibrary() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Toolbar */}
-      <div className="mb-6 rounded-[28px] border border-dark-700/50 bg-dark-900/45 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-sm sm:p-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="relative min-w-0 flex-1">
-              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search media, titles, captions..."
-                className="h-11 w-full rounded-2xl border border-dark-700/60 bg-dark-950/70 pl-10 pr-4 text-sm text-dark-100 outline-none transition-colors placeholder:text-dark-500 focus:border-dark-500"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-dark-700/40 bg-dark-900/35 p-2">
-              <div className="flex items-center gap-1 rounded-xl border border-dark-700/60 bg-dark-950/55 p-1">
-                {[
-                  { id: 'all', label: 'All' },
-                  { id: 'images', label: 'Images', icon: Image },
-                  { id: 'videos', label: 'Videos', icon: Film },
-                ].map((filter) => (
-                  <button
-                    key={filter.id}
-                    onClick={() => setFilterType(filter.id)}
-                    className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm transition-colors ${
-                      filterType === filter.id
-                        ? 'bg-dark-700 text-dark-100'
-                        : 'text-dark-400 hover:text-dark-200'
-                    }`}
-                  >
-                    {filter.icon && <filter.icon className="h-3.5 w-3.5" />}
-                    <span>{filter.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              <label className="flex h-8 items-center gap-2 rounded-xl border border-dark-700/60 bg-dark-950/55 px-3 text-sm text-dark-300">
-                <ArrowDownWideNarrow className="h-3.5 w-3.5 text-dark-400" />
-                <select
-                  value={sortMode}
-                  onChange={(e) => setSortMode(e.target.value)}
-                  className="bg-transparent text-sm text-dark-200 outline-none"
-                >
-                  {MEDIA_SORT_OPTIONS.map((option) => (
-                    <option key={option.id} value={option.id} className="bg-dark-900 text-dark-100">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-dark-700/40 bg-dark-900/35 p-2">
-            <div className="flex items-center gap-1 rounded-xl border border-dark-700/60 bg-dark-950/55 p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-dark-700 text-dark-100'
-                    : 'text-dark-400 hover:text-dark-200'
-                }`}
-              >
-                <Grid className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-dark-700 text-dark-100'
-                    : 'text-dark-400 hover:text-dark-200'
-                }`}
-              >
-                <List className="h-4 w-4" />
-              </button>
-            </div>
-
-            <button
-              onClick={() => setColorSortMode((prev) => !prev)}
-              className={`flex h-8 items-center gap-2 rounded-xl border px-3 text-sm transition-colors ${
-                colorSortMode
-                  ? 'border-dark-500 bg-dark-700 text-dark-100'
-                  : 'border-dark-700/60 bg-dark-950/55 text-dark-400 hover:text-dark-200'
-              }`}
-              title="AI Color Sort"
-            >
-              <Palette className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Color</span>
-            </button>
-
-            <button
-              onClick={handleOpenClarosaConnection}
-              className={`flex h-8 items-center gap-2 rounded-xl border px-3 text-sm transition-colors ${
-                clarosaConnected
-                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:text-emerald-200'
-                  : 'border-dark-700/60 bg-dark-950/55 text-dark-300 hover:text-dark-100'
-              }`}
-              title={clarosaConnected ? 'Manage Clarosa link' : 'Link Clarosa'}
-            >
-              <Link2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">
-                {clarosaConnected ? 'Clarosa Linked' : 'Link Clarosa'}
-              </span>
-            </button>
-
-            {clarosaConnected && (
-              <button
-                onClick={handleSyncClarosa}
-                disabled={clarosaSyncing || isUploading}
-                className="flex h-8 items-center gap-2 rounded-xl border border-dark-700/60 bg-dark-950/55 px-3 text-sm text-dark-300 transition-colors hover:text-dark-100 disabled:cursor-not-allowed disabled:opacity-60"
-                title="Sync Clarosa insight"
-              >
-                {clarosaSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">{clarosaSyncing ? 'Syncing...' : 'Sync Clarosa'}</span>
-              </button>
-            )}
-
-            <button
-              onClick={fetchAll}
-              className="flex h-8 w-8 items-center justify-center rounded-xl border border-dark-700/60 bg-dark-950/55 text-dark-400 transition-colors hover:text-dark-200"
-              title="Refresh"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </button>
-
-            <label className={`inline-flex h-10 items-center gap-2 rounded-2xl border px-4 text-sm font-medium transition-colors ${
-              isUploading
-                ? 'cursor-wait border-dark-700/60 bg-dark-200 text-dark-900'
-                : 'cursor-pointer border-white/20 bg-zinc-200 text-dark-900 hover:bg-white'
-            }`}>
-              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              <span>{isUploading ? `Uploading ${uploadProgress.completed}/${uploadProgress.total}` : 'Upload'}</span>
-              <input
-                type="file"
-                multiple
-                accept="image/*,video/*,.heic,.heif"
-                onChange={handleFileUpload}
-                className="hidden"
-                disabled={isUploading}
-              />
-            </label>
-          </div>
+      {/* Header + Toolbar */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-lg font-sans font-medium text-dark-100 tracking-tight">Library</div>
+          <label className={`inline-flex h-9 items-center gap-2 px-4 text-sm font-medium transition-colors ${
+            isUploading
+              ? 'cursor-wait bg-dark-300 text-dark-900'
+              : 'cursor-pointer bg-dark-300 text-dark-900 hover:bg-dark-200'
+          }`}>
+            <span>{isUploading ? `${uploadProgress.completed}/${uploadProgress.total}` : 'Upload'}</span>
+            <input
+              type="file"
+              multiple
+              accept="image/*,video/*,.heic,.heif"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={isUploading}
+            />
+          </label>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {summaryChips.map((chip) => (
-            <span
-              key={chip.id}
-              className="inline-flex items-center gap-2 rounded-full border border-dark-700/50 bg-dark-950/45 px-3 py-1 text-xs text-dark-300"
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search..."
+            className="h-8 w-48 border border-dark-700 bg-dark-800 px-3 text-sm text-dark-100 outline-none placeholder:text-dark-500 focus:border-dark-500"
+          />
+
+          {/* Filter */}
+          {['all', 'images', 'videos'].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilterType(f)}
+              className={`h-8 px-3 text-xs transition-colors ${
+                filterType === f
+                  ? 'bg-dark-700 text-dark-100'
+                  : 'text-dark-400 hover:text-dark-200'
+              }`}
             >
-              <span className="text-dark-500">{chip.label}</span>
-              <span className="text-dark-100">{chip.value}</span>
-            </span>
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
           ))}
 
-          <span className="inline-flex items-center gap-2 rounded-full border border-dark-700/50 bg-dark-950/45 px-3 py-1 text-xs text-dark-300">
-            <Smartphone className="h-3.5 w-3.5 text-dark-400" />
-            <span>Phone-ready uploads</span>
-          </span>
+          {/* Sort */}
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value)}
+            className="h-8 border border-dark-700 bg-dark-800 px-2 text-xs text-dark-200 outline-none"
+          >
+            {MEDIA_SORT_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+
+          {/* View toggle */}
+          <div className="flex border border-dark-700">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`h-8 w-8 flex items-center justify-center text-xs transition-colors ${
+                viewMode === 'grid' ? 'bg-dark-700 text-dark-100' : 'text-dark-400 hover:text-dark-200'
+              }`}
+            >
+              <Grid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`h-8 w-8 flex items-center justify-center text-xs transition-colors ${
+                viewMode === 'list' ? 'bg-dark-700 text-dark-100' : 'text-dark-400 hover:text-dark-200'
+              }`}
+            >
+              <List className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Color sort */}
+          <button
+            onClick={() => setColorSortMode((prev) => !prev)}
+            className={`h-8 px-3 text-xs border transition-colors ${
+              colorSortMode
+                ? 'border-dark-500 bg-dark-700 text-dark-100'
+                : 'border-dark-700 text-dark-400 hover:text-dark-200'
+            }`}
+          >
+            Color
+          </button>
+
+          {/* Clarosa */}
+          <button
+            onClick={handleOpenClarosaConnection}
+            className={`h-8 px-3 text-xs border transition-colors ${
+              clarosaConnected
+                ? 'border-dark-500 text-dark-200'
+                : 'border-dark-700 text-dark-400 hover:text-dark-200'
+            }`}
+          >
+            {clarosaConnected ? 'Clarosa' : 'Link Clarosa'}
+          </button>
 
           {clarosaConnected && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-dark-700/50 bg-dark-950/45 px-3 py-1 text-xs text-dark-300">
-              <Link2 className="h-3.5 w-3.5 text-dark-400" />
-              <span>Clarosa {clarosaMatchedCount} matched</span>
-            </span>
+            <button
+              onClick={handleSyncClarosa}
+              disabled={clarosaSyncing || isUploading}
+              className="h-8 px-3 text-xs border border-dark-700 text-dark-400 hover:text-dark-200 disabled:opacity-60"
+            >
+              {clarosaSyncing ? 'Syncing...' : 'Sync'}
+            </button>
           )}
 
-          {isUploading ? (
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>{uploadProgress.completed} of {uploadProgress.total} processed</span>
-            </span>
-          ) : (
-            totalCount > 0 && (
-              <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-dark-700/50 bg-dark-950/45 px-3 py-1 text-xs text-dark-400">
-                <CheckCircle2 className="h-3.5 w-3.5 text-dark-500" />
-                <span>Sorted {MEDIA_SORT_OPTIONS.find((option) => option.id === sortMode)?.label.toLowerCase()}</span>
-              </span>
-            )
-          )}
+          {/* Refresh */}
+          <button
+            onClick={fetchAll}
+            className="h-8 w-8 flex items-center justify-center border border-dark-700 text-dark-400 hover:text-dark-200"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
       {/* Error State */}
       {clarosaSyncMessage && !error && (
-        <div className="mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+        <div className="mb-4 border border-dark-700 bg-dark-800 px-4 py-2 text-xs text-dark-300">
           {clarosaSyncMessage}
         </div>
       )}
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-dark-600/70 bg-dark-800/55 px-4 py-3 text-sm text-dark-300">
+        <div className="mb-4 border border-dark-700 bg-dark-800 px-4 py-2 text-xs text-dark-300">
           {error}
           <button onClick={fetchAll} className="ml-4 text-dark-100 underline underline-offset-4">
             Retry
@@ -657,25 +580,23 @@ function MediaLibrary() {
 
       {/* Selection Bar */}
       {selectedItems.length > 0 && (
-        <div className="mb-4 flex items-center gap-4 p-3 bg-dark-800 rounded-lg border border-dark-700">
-          <span className="text-sm text-dark-200">
+        <div className="mb-4 flex items-center gap-4 p-3 bg-dark-800 border border-dark-700">
+          <span className="text-xs text-dark-200">
             {selectedItems.length} selected
           </span>
           <div className="flex items-center gap-2">
-            <button onClick={handleAddToGrid} className="btn-secondary text-sm py-1.5">
-              <Plus className="w-4 h-4" />
+            <button onClick={handleAddToGrid} className="btn-secondary text-xs py-1.5">
               Add to Grid
             </button>
-            <button onClick={handleDeleteSelected} className="btn-danger text-sm py-1.5">
-              <Trash2 className="w-4 h-4" />
+            <button onClick={handleDeleteSelected} className="btn-ghost text-xs py-1.5 text-dark-300">
               Delete
             </button>
           </div>
           <button
             onClick={() => setSelectedItems([])}
-            className="ml-auto text-sm text-dark-400 hover:text-dark-200"
+            className="ml-auto text-xs text-dark-400 hover:text-dark-200"
           >
-            Clear selection
+            Clear
           </button>
         </div>
       )}
@@ -684,16 +605,14 @@ function MediaLibrary() {
       <div className="flex-1 overflow-auto">
         {totalCount === 0 ? (
           <div className="h-full flex flex-col items-center justify-center">
-            <FolderOpen className="w-16 h-16 text-dark-500 mb-4" />
-            <p className="text-dark-300 mb-2">No media found</p>
-            <p className="text-sm text-dark-500 mb-4">
+            <p className="text-sm text-dark-300 mb-2">No media found</p>
+            <p className="text-xs text-dark-500 mb-4">
               {content.length > 0
                 ? 'Try adjusting your search or filter'
-                : 'Upload images, videos, or phone photos to get started'}
+                : 'Upload to get started'}
             </p>
-            <label className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-zinc-200 px-4 py-2 text-sm font-medium text-dark-900 transition-colors hover:bg-white">
-              <Upload className="w-4 h-4" />
-              Upload Media
+            <label className="inline-flex items-center gap-2 bg-dark-300 px-4 py-2 text-sm font-medium text-dark-900 transition-colors hover:bg-dark-200 cursor-pointer">
+              Upload
               <input
                 type="file"
                 multiple
@@ -717,7 +636,6 @@ function MediaLibrary() {
             {/* Grid Planner Section */}
             <GallerySection
               title="Grid Planner"
-              icon={LayoutGrid}
               items={sections.grid}
               isCollapsed={!!collapsedSections.grid}
               onToggle={() => toggleSection('grid')}
@@ -730,7 +648,6 @@ function MediaLibrary() {
             {/* Reels & TikTok Section */}
             <GallerySection
               title="Reels & TikTok"
-              icon={Film}
               items={sections.reels}
               isCollapsed={!!collapsedSections.reels}
               onToggle={() => toggleSection('reels')}
@@ -743,7 +660,6 @@ function MediaLibrary() {
             {/* YouTube Thumbnails Section */}
             <GallerySection
               title="YouTube Thumbnails"
-              icon={Youtube}
               items={sections.youtube}
               isCollapsed={!!collapsedSections.youtube}
               onToggle={() => toggleSection('youtube')}
@@ -757,7 +673,6 @@ function MediaLibrary() {
             {/* Unsorted Section */}
             <GallerySection
               title="Unsorted"
-              icon={FolderOpen}
               items={sections.unsorted}
               isCollapsed={!!collapsedSections.unsorted}
               onToggle={() => toggleSection('unsorted')}

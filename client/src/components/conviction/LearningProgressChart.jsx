@@ -126,7 +126,7 @@ function LearningProgressChart({ validations, timeRange }) {
       {/* Chart Legend */}
       <div className="flex items-center justify-center gap-6 mt-4 text-sm">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-0.5 bg-accent-purple rounded"></div>
+          <div className="w-8 h-0.5 bg-dark-100 rounded"></div>
           <span className="text-dark-400">Daily Accuracy</span>
         </div>
         <div className="flex items-center gap-2">
@@ -152,7 +152,7 @@ function LearningProgressChart({ validations, timeRange }) {
           <div className="text-sm text-dark-400 mt-1">Average Accuracy</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-accent-purple">
+          <div className="text-2xl font-bold text-dark-100">
             {chartData.reduce((sum, d) => sum + d.count, 0)}
           </div>
           <div className="text-sm text-dark-400 mt-1">Total Validations</div>

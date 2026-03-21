@@ -1404,7 +1404,7 @@ function YouTubePlanner() {
       )}
 
       {/* Collections Sidebar */}
-      <div className={`${collectionsCollapsed ? 'w-10' : 'w-72'} flex-shrink-0 h-full transition-all duration-200`}>
+      <div className={`${collectionsCollapsed ? 'w-10' : 'w-56'} flex-shrink-0 h-full transition-all duration-200`}>
         <YouTubeCollectionsManager
           onSelectCollection={setCurrentYoutubeCollection}
           selectedCollectionId={currentYoutubeCollectionId}
@@ -1416,9 +1416,9 @@ function YouTubePlanner() {
       {/* Main Grid Area */}
       <div className="flex-1 flex flex-col">
         {/* Toolbar */}
-        <div className="mb-4 rounded-2xl border border-dark-700/50 bg-dark-800/40 p-3">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2 rounded-xl border border-dark-700/40 bg-dark-900/20 p-2">
+        <div className="mb-3 border border-dark-700/40 bg-dark-800/30 p-2">
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1 sm:gap-1.5 border border-dark-700/30 bg-dark-900/15 p-1.5">
             {/* Collections Dropdown */}
             <div className="relative" ref={collectionsDropdownRef}>
               <button
@@ -1430,18 +1430,18 @@ function YouTubePlanner() {
                     setCruciblaPickerAnchorEl(null);
                   }
                 }}
-                className="flex items-center gap-2 h-9 px-2.5 sm:px-3 whitespace-nowrap border border-dark-700/60 bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 h-8 px-2 sm:px-2.5 whitespace-nowrap border border-dark-700/40 bg-dark-800/60 hover:bg-dark-700/60 transition-colors"
               >
-                <FolderOpen className="w-4 h-4 text-dark-100" />
-                <span className="text-sm font-medium text-dark-200 max-w-[100px] sm:max-w-[150px] 2xl:max-w-[220px] truncate">
+                <FolderOpen className="w-3.5 h-3.5 text-dark-400" />
+                <span className="text-xs font-medium tracking-wide text-dark-300 max-w-[100px] sm:max-w-[150px] 2xl:max-w-[220px] truncate">
                   {currentCollection.name}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-dark-400 transition-transform ${showCollectionsDropdown ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3 h-3 text-dark-500 transition-transform ${showCollectionsDropdown ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Dropdown Menu */}
               {showCollectionsDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-80 bg-dark-800 border border-dark-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <div className="absolute top-full left-0 mt-1 w-80 bg-dark-800 border border-dark-700/50 shadow-xl z-50 overflow-hidden">
                   <div className="max-h-80 overflow-y-auto">
                     {youtubeCollections?.map((collection) => {
                       const rolloutInfo = getCollectionRolloutInfo(collection);
@@ -1472,14 +1472,14 @@ function YouTubePlanner() {
                                     if (e.key === 'Enter') handleSaveRename(e);
                                     if (e.key === 'Escape') handleCancelRename(e);
                                   }}
-                                  className="flex-1 bg-dark-900 border border-dark-600 rounded px-2 py-1 text-sm text-dark-100 focus:outline-none focus:border-dark-300"
+                                  className="flex-1 bg-dark-900/60 border border-dark-700/40 px-2 py-1 text-xs text-dark-200 focus:outline-none focus:border-dark-500"
                                   autoFocus
                                 />
-                                <button onClick={handleSaveRename} className="p-1 text-dark-100 hover:bg-dark-600 rounded">
-                                  <Check className="w-3.5 h-3.5" />
+                                <button onClick={handleSaveRename} className="p-1 text-dark-200 hover:bg-dark-600">
+                                  <Check className="w-3 h-3" />
                                 </button>
-                                <button onClick={handleCancelRename} className="p-1 text-dark-400 hover:bg-dark-600 rounded">
-                                  <X className="w-3.5 h-3.5" />
+                                <button onClick={handleCancelRename} className="p-1 text-dark-500 hover:bg-dark-600">
+                                  <X className="w-3 h-3" />
                                 </button>
                               </div>
                             ) : (
@@ -1501,7 +1501,7 @@ function YouTubePlanner() {
                                     setShowColorPickerFor(showColorPickerFor === (collection._id || collection.id) ? null : collection.id);
                                     setShowRolloutPickerFor(null);
                                   }}
-                                  className="p-1 text-dark-500 hover:text-dark-200 hover:bg-dark-600 rounded"
+                                  className="p-1 text-dark-500 hover:text-dark-200 hover:bg-dark-700/60"
                                   title="Set Color"
                                 >
                                   <Palette className="w-3.5 h-3.5" />
@@ -1515,7 +1515,7 @@ function YouTubePlanner() {
                                     setShowCruciblaPickerFor(null);
                                     setCruciblaPickerAnchorEl(null);
                                   }}
-                                  className={`p-1 hover:bg-dark-600 rounded ${
+                                  className={`p-1 hover:bg-dark-700/60 ${
                                     collection.rolloutId ? 'text-dark-100' : 'text-dark-500 hover:text-dark-200'
                                   }`}
                                   title={collection.rolloutId ? 'Change Rollout' : 'Assign to Rollout'}
@@ -1533,7 +1533,7 @@ function YouTubePlanner() {
                                     setShowColorPickerFor(null);
                                     setShowRolloutPickerFor(null);
                                   }}
-                                  className={`p-1 hover:bg-dark-600 rounded ${
+                                  className={`p-1 hover:bg-dark-700/60 ${
                                     collection.cruciblaProjectId ? 'text-dark-100' : 'text-dark-500 hover:text-dark-200'
                                   }`}
                                   title={collection.cruciblaProjectId ? `Linked: ${collection.cruciblaProjectName}` : 'Link to Crucibla Project'}
@@ -1542,14 +1542,14 @@ function YouTubePlanner() {
                                 </button>
                                 <button
                                   onClick={(e) => handleStartRename(e, collection)}
-                                  className="p-1 text-dark-500 hover:text-dark-200 hover:bg-dark-600 rounded"
+                                  className="p-1 text-dark-500 hover:text-dark-200 hover:bg-dark-700/60"
                                   title="Rename"
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={(e) => handleDuplicateCollection(e, collection.id)}
-                                  className="p-1 text-dark-500 hover:text-dark-200 hover:bg-dark-600 rounded"
+                                  className="p-1 text-dark-500 hover:text-dark-200 hover:bg-dark-700/60"
                                   title="Duplicate"
                                 >
                                   <Copy className="w-3.5 h-3.5" />
@@ -1557,7 +1557,7 @@ function YouTubePlanner() {
                                 {youtubeCollections.length > 1 && (
                                   <button
                                     onClick={(e) => handleDeleteCollection(e, collection.id)}
-                                    className="p-1 text-dark-500 hover:text-dark-200 hover:bg-dark-600 rounded"
+                                    className="p-1 text-dark-500 hover:text-dark-200 hover:bg-dark-700/60"
                                     title="Delete"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -1571,10 +1571,10 @@ function YouTubePlanner() {
                           {rolloutInfo && (
                             <div className="px-3 pb-1 -mt-1">
                               <div
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs"
-                                style={{ backgroundColor: `${rolloutInfo.section.color}20`, color: rolloutInfo.section.color }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px]"
+                                style={{ backgroundColor: `${rolloutInfo.section.color}15`, color: rolloutInfo.section.color }}
                               >
-                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: rolloutInfo.section.color }} />
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rolloutInfo.section.color }} />
                                 {rolloutInfo.rollout.name} → {rolloutInfo.section.name}
                               </div>
                             </div>
@@ -1584,7 +1584,7 @@ function YouTubePlanner() {
                           {collection.cruciblaProjectId && (
                             <div className="px-3 pb-2 -mt-1">
                               <div
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px]"
                                 style={{
                                   backgroundColor: collection.cruciblaProjectId ? `${collection.group_color || '#6366f1'}20` : undefined,
                                   color: collection.group_color || '#6366f1',
@@ -1600,8 +1600,8 @@ function YouTubePlanner() {
 
                           {/* Color Picker Dropdown */}
                           {showColorPickerFor === (collection._id || collection.id) && (
-                            <div className="absolute left-full top-0 ml-1 w-36 bg-dark-900 border border-dark-600 rounded-lg shadow-xl z-50 p-2" onClick={(e) => e.stopPropagation()}>
-                              <p className="text-xs text-dark-400 mb-2 px-1">Select Color</p>
+                            <div className="absolute left-full top-0 ml-1 w-36 bg-dark-800 border border-dark-700/50 shadow-xl z-50 p-2" onClick={(e) => e.stopPropagation()}>
+                              <p className="text-[10px] tracking-wide text-dark-500 mb-2 px-1">Select Color</p>
                               <div className="grid grid-cols-5 gap-1">
                                 {COLLECTION_COLORS.map((color) => (
                                   <button
@@ -1617,7 +1617,7 @@ function YouTubePlanner() {
                               </div>
                               <button
                                 onClick={(e) => handleColorSelect(e, collection.id, null)}
-                                className="w-full mt-2 px-2 py-1 text-xs text-dark-400 hover:text-dark-200 hover:bg-dark-700 rounded"
+                                className="w-full mt-2 px-2 py-1 text-[10px] tracking-wide text-dark-500 hover:text-dark-300 hover:bg-dark-700/60"
                               >
                                 Clear Color
                               </button>
@@ -1626,8 +1626,8 @@ function YouTubePlanner() {
 
                           {/* Rollout Picker Dropdown */}
                           {showRolloutPickerFor === (collection._id || collection.id) && (
-                            <div className="absolute left-full top-0 ml-1 w-56 bg-dark-900 border border-dark-600 rounded-lg shadow-xl z-50 p-2 max-h-64 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                              <p className="text-xs text-dark-400 mb-2 px-1">Assign to Phase</p>
+                            <div className="absolute left-full top-0 ml-1 w-56 bg-dark-800 border border-dark-700/50 shadow-xl z-50 p-2 max-h-64 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                              <p className="text-[10px] tracking-wide text-dark-500 mb-2 px-1">Assign to Phase</p>
                               {rollouts.length === 0 ? (
                                 <p className="text-xs text-dark-500 px-1">No rollouts created yet</p>
                               ) : (
@@ -1641,8 +1641,8 @@ function YouTubePlanner() {
                                         <button
                                           key={section.id}
                                           onClick={(e) => handleAssignToRollout(e, collection.id, rollout.id, section.id)}
-                                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-left rounded hover:bg-dark-700 ${
-                                            collection.sectionId === section.id ? 'bg-dark-700' : ''
+                                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-dark-700/60 ${
+                                            collection.sectionId === section.id ? 'bg-dark-700/60' : ''
                                           }`}
                                         >
                                           <span
@@ -1662,7 +1662,7 @@ function YouTubePlanner() {
                               {collection.rolloutId && (
                                 <button
                                   onClick={(e) => handleUnassignFromRollout(e, collection._id || collection.id)}
-                                  className="w-full mt-2 px-2 py-1.5 text-xs text-dark-300 hover:bg-dark-600/30 rounded flex items-center gap-2"
+                                  className="w-full mt-2 px-2 py-1.5 text-xs text-dark-400 hover:bg-dark-700/60 flex items-center gap-2"
                                 >
                                   <Unlink className="w-3 h-3" />
                                   Remove from Rollout
@@ -1691,13 +1691,13 @@ function YouTubePlanner() {
                     })}
                   </div>
                   {/* Create New Collection */}
-                  <div className="border-t border-dark-700">
+                  <div className="border-t border-dark-700/40">
                     <button
                       onClick={handleCreateCollection}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-dark-400 hover:text-dark-200 hover:bg-dark-700 transition-colors"
+                      className="w-full flex items-center gap-1.5 px-3 py-2 text-dark-500 hover:text-dark-300 hover:bg-dark-700/60 transition-colors"
                     >
-                      <Plus className="w-4 h-4" />
-                      <span className="text-sm">New Collection</span>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span className="text-xs tracking-wide">New Collection</span>
                     </button>
                   </div>
                 </div>
@@ -1708,18 +1708,17 @@ function YouTubePlanner() {
               type="button"
               onClick={(e) => handleDuplicateCollection(e, currentCollection._id || currentCollection.id)}
               disabled={syncing || !currentYoutubeCollectionId}
-              className="flex shrink-0 items-center gap-2 h-9 px-2.5 sm:px-3 whitespace-nowrap border border-dark-700/60 bg-dark-800 hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+              className="flex shrink-0 items-center gap-1.5 h-8 px-2 sm:px-2.5 whitespace-nowrap border border-dark-700/40 bg-dark-800/60 hover:bg-dark-700/60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title={`Duplicate ${currentCollection.name}`}
             >
-              <Copy className="w-4 h-4 text-dark-200" />
-              <span className="hidden 2xl:inline text-sm font-medium text-dark-200">Duplicate Collection</span>
-              <span className="hidden sm:inline 2xl:hidden text-sm font-medium text-dark-200">Duplicate</span>
+              <Copy className="w-3.5 h-3.5 text-dark-400" />
+              <span className="hidden sm:inline text-xs font-medium tracking-wide text-dark-400">Duplicate</span>
             </button>
 
             {/* Crucibla Project Badge (toolbar) */}
             {currentCollection.cruciblaProjectId && (
               <div
-                className="flex min-w-0 max-w-full items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-lg text-xs"
+                className="flex min-w-0 max-w-full items-center gap-1.5 h-8 px-2 sm:px-2.5 text-[11px]"
                 style={{
                   backgroundColor: `${currentCollection.group_color || '#6366f1'}15`,
                   color: currentCollection.group_color || '#6366f1',
@@ -1732,38 +1731,37 @@ function YouTubePlanner() {
             )}
 
             {/* Video Count */}
-            <div className="flex shrink-0 items-center gap-2 h-9 px-2.5 sm:px-3 whitespace-nowrap border border-dark-700/60 bg-dark-800 rounded-lg" title={`${youtubeVideos.length} videos in this collection`}>
-              <Youtube className="w-4 h-4 text-dark-100" />
-              <span className="text-sm font-medium text-dark-200">{youtubeVideos.length}</span>
-              <span className="hidden md:inline text-sm font-medium text-dark-200">Videos</span>
+            <div className="flex shrink-0 items-center gap-1.5 h-8 px-2 sm:px-2.5 whitespace-nowrap border border-dark-700/40 bg-dark-800/60" title={`${youtubeVideos.length} videos in this collection`}>
+              <Youtube className="w-3.5 h-3.5 text-dark-400" />
+              <span className="text-xs font-medium text-dark-400">{youtubeVideos.length}</span>
             </div>
 
             {/* Versions Button */}
             <div className="relative" ref={versionsDropdownRef}>
               <button
                 onClick={handleToggleVersions}
-                className="h-9 w-9 flex items-center justify-center border border-dark-700/60 bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
+                className="h-8 w-8 flex items-center justify-center border border-dark-700/40 bg-dark-800/60 hover:bg-dark-700/60 transition-colors"
                 title="Versions"
               >
-                <History className="w-4 h-4 text-dark-400" />
+                <History className="w-3.5 h-3.5 text-dark-500" />
               </button>
 
               {showVersionsDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-72 bg-dark-800 border border-dark-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                  <div className="p-3 border-b border-dark-700">
-                    <div className="flex items-center gap-2">
+                <div className="absolute top-full left-0 mt-1 w-72 bg-dark-800 border border-dark-700/50 shadow-xl z-50 overflow-hidden">
+                  <div className="p-2.5 border-b border-dark-700/40">
+                    <div className="flex items-center gap-1.5">
                       <input
                         type="text"
                         value={versionName}
                         onChange={(e) => setVersionName(e.target.value)}
                         placeholder="Version name (optional)"
-                        className="flex-1 bg-dark-900 border border-dark-600 rounded px-2 py-1.5 text-sm text-dark-100 focus:outline-none focus:border-dark-300"
+                        className="flex-1 bg-dark-900/60 border border-dark-700/40 px-2 py-1.5 text-xs text-dark-200 focus:outline-none focus:border-dark-500"
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveVersion()}
                       />
                       <button
                         onClick={handleSaveVersion}
                         disabled={syncing}
-                        className="px-3 py-1.5 bg-dark-100 hover:bg-white text-dark-900 text-sm rounded-lg transition-colors disabled:opacity-50"
+                        className="px-2.5 py-1.5 bg-dark-200 hover:bg-dark-100 text-dark-900 text-xs font-medium transition-colors disabled:opacity-50"
                       >
                         Save
                       </button>
@@ -1786,15 +1784,15 @@ function YouTubePlanner() {
                           <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                             <button
                               onClick={() => handleRestoreVersion(v.index)}
-                              className="px-2 py-1 text-xs text-dark-300 hover:text-dark-100 hover:bg-dark-600 rounded transition-colors"
+                              className="px-2 py-1 text-[10px] tracking-wide text-dark-400 hover:text-dark-200 hover:bg-dark-700/60 transition-colors"
                             >
                               Restore
                             </button>
                             <button
                               onClick={() => handleDeleteVersion(v.index)}
-                              className="p-1 text-dark-500 hover:text-dark-200 hover:bg-dark-600 rounded transition-colors"
+                              className="p-1 text-dark-500 hover:text-dark-300 hover:bg-dark-700/60 transition-colors"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
@@ -1809,108 +1807,107 @@ function YouTubePlanner() {
             <button
               onClick={fetchCollections}
               disabled={loading || syncing}
-              className="h-9 w-9 flex items-center justify-center border border-dark-700/60 bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors disabled:opacity-50"
+              className="h-8 w-8 flex items-center justify-center border border-dark-700/40 bg-dark-800/60 hover:bg-dark-700/60 transition-colors disabled:opacity-50"
               title="Refresh from cloud"
             >
-              <RefreshCw className={`w-4 h-4 text-dark-400 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-dark-500 ${loading ? 'animate-spin' : ''}`} />
             </button>
 
             {/* Bulk Replace Button */}
             <button
               onClick={() => { setBulkReplaceScope('collection'); setShowBulkReplace(true); }}
-              className="h-9 w-9 flex items-center justify-center border border-dark-700/60 bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
+              className="h-8 w-8 flex items-center justify-center border border-dark-700/40 bg-dark-800/60 hover:bg-dark-700/60 transition-colors"
               title="Bulk replace thumbnails"
             >
-              <Images className="w-4 h-4 text-dark-400" />
+              <Images className="w-3.5 h-3.5 text-dark-500" />
             </button>
 
             <button
               onClick={() => setShowCollectionSchedule(true)}
-              className="flex items-center gap-2 h-9 px-3 border border-dark-700/60 bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 h-8 px-2.5 border border-dark-700/40 bg-dark-800/60 hover:bg-dark-700/60 transition-colors"
               title="Schedule this collection in order"
             >
-              <Calendar className="w-4 h-4 text-dark-300" />
-              <span className="text-sm text-dark-200">Schedule</span>
+              <Calendar className="w-3.5 h-3.5 text-dark-500" />
+              <span className="text-xs tracking-wide text-dark-400">Schedule</span>
             </button>
 
             {/* View Mode Toggle */}
-            <div className="flex items-center h-9 border border-dark-700/60 bg-dark-800 rounded-lg p-1 gap-0.5">
+            <div className="flex items-center h-8 border border-dark-700/40 bg-dark-800/60 p-0.5 gap-0.5">
               <button
                 onClick={() => setYoutubeViewMode('grid')}
-                className={`h-7 w-7 flex items-center justify-center rounded-md transition-colors ${
+                className={`h-7 w-7 flex items-center justify-center transition-colors ${
                   youtubeViewMode === 'grid'
-                    ? 'bg-dark-100 text-dark-900'
-                    : 'text-dark-400 hover:text-dark-200'
+                    ? 'bg-dark-200 text-dark-900'
+                    : 'text-dark-500 hover:text-dark-300'
                 }`}
                 title="Grid View"
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setYoutubeViewMode('sidebar')}
-                className={`h-7 w-7 flex items-center justify-center rounded-md transition-colors ${
+                className={`h-7 w-7 flex items-center justify-center transition-colors ${
                   youtubeViewMode === 'sidebar'
-                    ? 'bg-dark-100 text-dark-900'
-                    : 'text-dark-400 hover:text-dark-200'
+                    ? 'bg-dark-200 text-dark-900'
+                    : 'text-dark-500 hover:text-dark-300'
                 }`}
                 title="List View"
               >
-                <List className="w-4 h-4" />
+                <List className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {/* Lock Toggle */}
             <button
               onClick={() => setIsLocked(!isLocked)}
-              className={`flex items-center gap-2 h-9 px-3 rounded-lg transition-colors ${
+              className={`flex items-center gap-1.5 h-8 px-2.5 transition-colors ${
                 isLocked
-                  ? 'border border-amber-500/30 bg-amber-500/15 text-amber-400'
-                  : 'border border-dark-700/60 bg-dark-800 text-dark-300 hover:bg-dark-700'
+                  ? 'border border-amber-500/20 bg-amber-500/10 text-amber-400/80'
+                  : 'border border-dark-700/40 bg-dark-800/60 text-dark-500 hover:bg-dark-700/60'
               }`}
               title={isLocked ? 'Click to enable drag & drop reordering' : 'Click to lock grid (prevent reordering)'}
             >
-              {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-              <span className="hidden 2xl:inline text-sm font-medium">{isLocked ? 'Locked' : 'Unlocked'}</span>
-              <span className="hidden sm:inline 2xl:hidden text-sm font-medium">{isLocked ? 'Lock' : 'Unlock'}</span>
+              {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline text-xs font-medium tracking-wide">{isLocked ? 'Locked' : 'Unlocked'}</span>
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dark-700/40 bg-dark-900/20 p-2.5">
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="flex items-center gap-2 rounded-xl border border-dark-700/70 bg-dark-950/90 px-2.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                <span className="text-[11px] font-medium text-dark-500">Thumbnail</span>
+          <div className="flex flex-wrap items-center justify-between gap-1.5 border border-dark-700/30 bg-dark-900/15 p-1.5">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <div className="flex items-center gap-1.5 border border-dark-700/30 bg-dark-800/40 px-2 py-1">
+                <span className="text-[10px] font-medium tracking-wide text-dark-500">Thumb</span>
                 <div className="relative">
                   <select
                     value={thumbnailPreference}
                     onChange={(e) => setThumbnailPreference(e.target.value)}
-                    className="h-7 min-w-[9.5rem] appearance-none rounded-lg border border-dark-700/70 bg-black pl-2.5 pr-8 text-sm text-dark-100 focus:outline-none focus:border-dark-500"
+                    className="h-6 min-w-[8rem] appearance-none border border-dark-700/40 bg-dark-900/60 pl-2 pr-7 text-xs text-dark-300 focus:outline-none focus:border-dark-500"
                     style={{ colorScheme: 'dark' }}
                     title="Default thumbnail workflow for uploaded videos"
                   >
-                    <option value="custom" style={{ backgroundColor: '#000000', color: '#f5f5f5' }}>Prefer custom</option>
-                    <option value="auto" style={{ backgroundColor: '#000000', color: '#f5f5f5' }}>Video frame</option>
-                    <option value="ask" style={{ backgroundColor: '#000000', color: '#f5f5f5' }}>Ask each time</option>
+                    <option value="custom" style={{ backgroundColor: '#1a1a1a', color: '#d4d4d4' }}>Prefer custom</option>
+                    <option value="auto" style={{ backgroundColor: '#1a1a1a', color: '#d4d4d4' }}>Video frame</option>
+                    <option value="ask" style={{ backgroundColor: '#1a1a1a', color: '#d4d4d4' }}>Ask each time</option>
                   </select>
-                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-dark-500" />
+                  <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-dark-500" />
                 </div>
               </div>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-1.5">
               {/* Export */}
               <button
                 onClick={handleExport}
-                className="flex items-center gap-2 h-8 px-3 rounded-lg border border-dark-700/60 bg-dark-900/70 text-dark-400 hover:text-dark-100 hover:bg-dark-800 transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 h-7 px-2.5 border border-dark-700/40 bg-dark-800/60 text-dark-500 hover:text-dark-300 hover:bg-dark-700/60 transition-colors disabled:opacity-50"
                 disabled
                 title="Coming in Phase 3"
               >
-                <Download className="w-4 h-4" />
-                <span className="text-sm">Export</span>
+                <Download className="w-3.5 h-3.5" />
+                <span className="text-xs tracking-wide">Export</span>
               </button>
 
               {/* Upload Button */}
-              <label className="flex items-center gap-2 h-8 px-3.5 rounded-lg border border-[#f0ede8]/25 bg-[#f0ede8] text-[#111111] text-sm font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] transition-colors hover:bg-white cursor-pointer">
-                <Upload className="w-4 h-4" />
+              <label className="flex items-center gap-1.5 h-7 px-3 border border-dark-300/20 bg-dark-200 text-dark-900 text-xs font-medium tracking-wide transition-colors hover:bg-dark-100 cursor-pointer">
+                <Upload className="w-3.5 h-3.5" />
                 <span>Upload</span>
                 <input
                   type="file"
@@ -1955,19 +1952,21 @@ function YouTubePlanner() {
         </div>
       </div>
 
-      {/* Right Sidebar - Video Details */}
-      <div className="w-80 flex-shrink-0">
-        <YouTubeVideoDetails
-          video={selectedVideo}
-          onThumbnailUpload={handleThumbnailUpload}
-          videoClipboard={videoClipboard}
-          currentCollection={currentCollection}
-          currentCollectionName={currentCollection.name}
-          onCopyVideo={handleCopyVideo}
-          onCutVideo={handleCutVideo}
-          onPasteVideo={handlePasteVideo}
-        />
-      </div>
+      {/* Right Sidebar - Video Details (collapsed when no video selected) */}
+      {selectedVideo && (
+        <div className="w-80 flex-shrink-0">
+          <YouTubeVideoDetails
+            video={selectedVideo}
+            onThumbnailUpload={handleThumbnailUpload}
+            videoClipboard={videoClipboard}
+            currentCollection={currentCollection}
+            currentCollectionName={currentCollection.name}
+            onCopyVideo={handleCopyVideo}
+            onCutVideo={handleCutVideo}
+            onPasteVideo={handlePasteVideo}
+          />
+        </div>
+      )}
 
       {/* Thumbnail Editor Modal */}
       {editingThumbnail && (

@@ -74,7 +74,7 @@ const CampaignReliabilityScorecard = ({ gridItems = [] }) => {
       <div
         className={`mt-2 h-8 px-2 border text-xs flex items-center gap-1.5 ${
           metrics.gateReady
-            ? 'border-accent-purple/30 bg-accent-purple/10 text-dark-200'
+            ? 'border-dark-300/30 bg-dark-300/10 text-dark-200'
             : 'border-dark-600 bg-dark-800 text-dark-300'
         }`}
       >

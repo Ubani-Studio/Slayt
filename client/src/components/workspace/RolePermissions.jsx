@@ -105,7 +105,7 @@ function RolePermissions({ member, onUpdatePermissions, isOwner }) {
                 </label>
               ) : (
                 <span className={`permission-status ${permissions[perm.key] ? 'enabled' : 'disabled'}`}>
-                  {permissions[perm.key] ? '✓' : '✕'}
+                  {permissions[perm.key] ? 'Yes' : 'No'}
                 </span>
               )}
             </div>

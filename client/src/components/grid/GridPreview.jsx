@@ -3678,7 +3678,7 @@ function GridPreview({ posts, layout, showRowHandles = true, showConvictionScore
           className={`text-[10px] px-1.5 py-0.5 rounded ${isVerified ? 'bg-blue-500/20 text-blue-400' : 'bg-dark-700 text-dark-400'} hover:opacity-80 transition-opacity`}
           title="Toggle verified badge"
         >
-          {isVerified ? '✓ Verified' : 'Add ✓'}
+          {isVerified ? 'Verified' : 'Verify'}
         </button>
       </div>
 
@@ -3951,9 +3951,9 @@ function GridPreview({ posts, layout, showRowHandles = true, showConvictionScore
           {/* Success Banner */}
           {postsWithConviction.length > 0 && postsWithConviction.every(p => p.conviction) && (
             <div className="px-4 py-3 bg-dark-700/50 border-b border-dark-600 flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-accent-purple animate-pulse"></div>
+              <div className="w-2 h-2 rounded-full bg-dark-100 animate-pulse"></div>
               <span className="text-sm font-medium text-dark-100">
-                ✓ Conviction Scores Active - {postsWithConviction.length} posts scored
+                Conviction Scores Active — {postsWithConviction.length} posts scored
               </span>
             </div>
           )}

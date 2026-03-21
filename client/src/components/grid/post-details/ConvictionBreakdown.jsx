@@ -16,7 +16,7 @@ const COMPONENT_META = {
 
 const BAR_COLORS = {
   blue: { bar: 'bg-blue-500', track: 'bg-blue-500/10' },
-  emerald: { bar: 'bg-accent-purple', track: 'bg-accent-purple/10' },
+  emerald: { bar: 'bg-dark-100', track: 'bg-dark-100/10' },
   purple: { bar: 'bg-purple-500', track: 'bg-purple-500/10' },
   amber: { bar: 'bg-amber-500', track: 'bg-amber-500/10' },
   cyan: { bar: 'bg-cyan-500', track: 'bg-cyan-500/10' },
@@ -63,7 +63,7 @@ function getCalibrationStatus(adsCount) {
 
 function getAdsTier(score) {
   if (score >= 80) return { label: 'Deep', class: 'text-dark-100 bg-dark-600/25' };
-  if (score >= 60) return { label: 'Engaged', class: 'text-accent-purple bg-accent-purple/15' };
+  if (score >= 60) return { label: 'Engaged', class: 'text-dark-200 bg-dark-100/15' };
   if (score >= 40) return { label: 'Surface', class: 'text-dark-300 bg-dark-600/25' };
   return { label: 'Shallow', class: 'text-dark-300 bg-dark-600/25' };
 }

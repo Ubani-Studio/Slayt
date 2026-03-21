@@ -193,11 +193,11 @@
 @layer components {
   /* Button variants */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
-    @apply btn bg-dark-100 hover:bg-white text-dark-900;
+    @apply btn bg-dark-300 hover:bg-dark-200 text-dark-900;
   }
 
   .btn-secondary {
@@ -213,12 +213,12 @@
   }
 
   .btn-icon {
-    @apply p-2 rounded-md hover:bg-dark-700 text-dark-300 hover:text-dark-100 transition-colors;
+    @apply p-2 hover:bg-dark-700 text-dark-300 hover:text-dark-100 transition-colors;
   }
 
   /* Input styles */
   .input {
-    @apply w-full px-4 py-2.5 bg-dark-800 border border-dark-600 rounded-lg text-dark-100 placeholder-dark-400 focus:border-dark-300 focus:ring-1 focus:ring-dark-300 transition-colors;
+    @apply w-full px-4 py-2.5 bg-dark-800 border border-dark-600 text-dark-100 placeholder-dark-400 focus:border-dark-300 focus:ring-1 focus:ring-dark-300 transition-colors;
   }
 
   .input-label {
@@ -227,7 +227,7 @@
 
   /* Card styles */
   .card {
-    @apply bg-dark-800 rounded-lg p-4;
+    @apply bg-dark-800 p-4;
   }
 
   .card-hover {
@@ -236,7 +236,7 @@
 
   /* Panel styles */
   .panel {
-    @apply bg-dark-800 rounded-lg;
+    @apply bg-dark-800;
   }
 
   /* Badge styles */
@@ -254,12 +254,12 @@
 
   /* Tooltip */
   .tooltip {
-    @apply absolute z-50 px-2 py-1 text-xs bg-dark-700 text-dark-100 rounded shadow-lg whitespace-nowrap;
+    @apply absolute z-50 px-2 py-1 text-xs bg-dark-700 text-dark-100 shadow-lg whitespace-nowrap;
   }
 
   /* Slider track */
   input[type="range"] {
-    @apply w-full h-2 bg-dark-700 rounded-lg appearance-none cursor-pointer;
+    @apply w-full h-2 bg-dark-700 appearance-none cursor-pointer;
   }
 
   input[type="range"]::-webkit-slider-thumb {
@@ -268,7 +268,7 @@
 
   /* Grid item for Instagram preview */
   .grid-item {
-    @apply aspect-square bg-dark-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border-2 border-transparent hover:border-dark-500;
+    @apply aspect-square bg-dark-700 overflow-hidden cursor-pointer transition-all duration-200 border-2 border-transparent hover:border-dark-500;
   }
 
   .grid-item.selected {

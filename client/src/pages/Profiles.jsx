@@ -3,28 +3,10 @@ import { useAppStore } from '../stores/useAppStore';
 import { profileApi } from '../lib/api';
 import {
   User,
-  Plus,
-  Pencil,
-  Trash2,
-  Star,
   Check,
   X,
-  Instagram,
-  Link2,
-  Unlink,
   Loader2,
-  AlertCircle,
-  Upload,
 } from 'lucide-react';
-
-// TikTok icon component
-function TikTokIcon({ className }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z"/>
-    </svg>
-  );
-}
 
 // Preset colors for profiles
 const PROFILE_COLORS = [
@@ -203,32 +185,25 @@ function Profiles() {
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-display font-semibold text-dark-100 mb-2 uppercase tracking-widest">
-            Profiles
-          </h1>
-          <p className="text-dark-400">
-            Manage your social media profiles. Each profile has its own grids and collections.
-          </p>
+      <div className="flex items-center justify-between mb-6">
+        <div className="text-lg font-sans font-medium text-dark-100 tracking-tight">
+          Profiles
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
           className="btn-primary"
         >
-          <Plus className="w-4 h-4" />
           New Profile
         </button>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 bg-dark-700/50 border border-dark-600 rounded-lg text-dark-300 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+        <div className="mb-6 p-4 bg-dark-700/50 border border-dark-600 text-dark-300 flex items-center gap-3">
           <span>{error}</span>
           <button
             onClick={() => setError(null)}
-            className="ml-auto p-1 hover:bg-dark-700/30 rounded"
+            className="ml-auto p-1 hover:bg-dark-700/30"
           >
             <X className="w-4 h-4" />
           </button>
@@ -244,9 +219,9 @@ function Profiles() {
           return (
             <div
               key={profile._id || profile.id}
-              className={`bg-dark-800 rounded-xl border border-dark-700 p-6 ${
+              className={`bg-dark-800 border border-dark-700 p-6 ${
                 (profile._id || profile.id) === currentProfileId
-                  ? 'ring-2 ring-dark-300'
+                  ? 'ring-1 ring-dark-300'
                   : ''
               }`}
             >
@@ -301,13 +276,7 @@ function Profiles() {
                       )}
 
                       {/* Platform */}
-                      <div className="flex items-center gap-2 mt-2">
-                        {(profile.platform === 'instagram' || profile.platform === 'both') && (
-                          <Instagram className="w-4 h-4 text-pink-500" />
-                        )}
-                        {(profile.platform === 'tiktok' || profile.platform === 'both') && (
-                          <TikTokIcon className="w-4 h-4 text-dark-300" />
-                        )}
+                      <div className="mt-2">
                         <span className="text-xs text-dark-500 capitalize">
                           {profile.platform}
                         </span>
@@ -315,31 +284,28 @@ function Profiles() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       {!profile.isDefault && (
                         <button
                           onClick={() => handleSetDefault(profile._id)}
-                          className="btn-icon"
-                          title="Set as default"
+                          className="text-xs text-dark-400 hover:text-dark-200 transition-colors"
                           disabled={saving}
                         >
-                          <Star className="w-4 h-4" />
+                          Set default
                         </button>
                       )}
                       <button
                         onClick={() => setEditingProfile(profile._id)}
-                        className="btn-icon"
-                        title="Edit profile"
+                        className="text-xs text-dark-400 hover:text-dark-200 transition-colors"
                       >
-                        <Pencil className="w-4 h-4" />
+                        Edit
                       </button>
                       {profiles.length > 1 && (
                         <button
                           onClick={() => setDeleteConfirm(profile._id)}
-                          className="btn-icon text-dark-300 hover:bg-dark-600/30"
-                          title="Delete profile"
+                          className="text-xs text-dark-500 hover:text-dark-300 transition-colors"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          Delete
                         </button>
                       )}
                     </div>
@@ -347,17 +313,16 @@ function Profiles() {
 
                   {/* Social Connections */}
                   <div className="mt-6 pt-4 border-t border-dark-700">
-                    <h4 className="text-sm font-medium text-dark-300 mb-3">
-                      Social Connections
+                    <h4 className="text-xs text-dark-400 mb-3">
+                      Connections
                     </h4>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       {/* Instagram */}
-                      <div className="bg-dark-700/50 rounded-lg p-3">
+                      <div className="bg-dark-700/50 p-3">
                         <div className="flex items-center gap-2 mb-2">
-                          <Instagram className="w-4 h-4 text-pink-500" />
                           <span className="text-sm font-medium text-dark-200">Instagram</span>
                           {status.instagram?.connected && (
-                            <Check className="w-4 h-4 text-dark-100 ml-auto" />
+                            <span className="text-xs text-dark-400 ml-auto">Connected</span>
                           )}
                         </div>
                         {status.instagram?.connected ? (
@@ -401,12 +366,11 @@ function Profiles() {
                       </div>
 
                       {/* TikTok */}
-                      <div className="bg-dark-700/50 rounded-lg p-3">
+                      <div className="bg-dark-700/50 p-3">
                         <div className="flex items-center gap-2 mb-2">
-                          <TikTokIcon className="w-4 h-4" />
                           <span className="text-sm font-medium text-dark-200">TikTok</span>
                           {status.tiktok?.connected && (
-                            <Check className="w-4 h-4 text-dark-100 ml-auto" />
+                            <span className="text-xs text-dark-400 ml-auto">Connected</span>
                           )}
                         </div>
                         {status.tiktok?.connected ? (
@@ -457,7 +421,7 @@ function Profiles() {
               {/* Delete Confirmation */}
               {deleteConfirm === profile._id && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                  <div className="bg-dark-800 rounded-xl p-6 w-96 border border-dark-700">
+                  <div className="bg-dark-800 p-6 w-96 border border-dark-700">
                     <h3 className="text-lg font-medium text-dark-100 mb-2">
                       Delete Profile
                     </h3>
@@ -475,7 +439,7 @@ function Profiles() {
                       <button
                         onClick={() => handleDeleteProfile(profile._id)}
                         disabled={saving}
-                        className="flex-1 px-4 py-2 bg-dark-600/30 text-dark-300 rounded-lg hover:bg-dark-600/40 transition-colors disabled:opacity-50"
+                        className="flex-1 px-4 py-2 bg-dark-600/30 text-dark-300 hover:bg-dark-600/40 transition-colors disabled:opacity-50"
                       >
                         {saving ? 'Deleting...' : 'Delete'}
                       </button>
@@ -488,19 +452,17 @@ function Profiles() {
         })}
 
         {profiles.length === 0 && (
-          <div className="text-center py-16 bg-dark-800 rounded-xl border border-dark-700">
-            <User className="w-16 h-16 text-dark-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-dark-200 mb-2">
+          <div className="text-center py-16 bg-dark-800 border border-dark-700">
+            <h3 className="text-sm font-medium text-dark-200 mb-2">
               No profiles yet
             </h3>
-            <p className="text-dark-400 mb-4">
+            <p className="text-xs text-dark-400 mb-4">
               Create your first profile to get started
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
               className="btn-primary"
             >
-              <Plus className="w-4 h-4" />
               Create Profile
             </button>
           </div>
@@ -546,7 +508,7 @@ function ProfileEditForm({ profile, onSave, onCancel, saving }) {
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
+            className="w-full bg-dark-700 border border-dark-600 px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
             required
           />
         </div>
@@ -559,7 +521,7 @@ function ProfileEditForm({ profile, onSave, onCancel, saving }) {
             value={formData.username}
             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
             placeholder="@username"
-            className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
+            className="w-full bg-dark-700 border border-dark-600 px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
           />
         </div>
       </div>
@@ -572,7 +534,7 @@ function ProfileEditForm({ profile, onSave, onCancel, saving }) {
           value={formData.bio}
           onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
           rows={2}
-          className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300 resize-none"
+          className="w-full bg-dark-700 border border-dark-600 px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300 resize-none"
         />
       </div>
 
@@ -584,7 +546,7 @@ function ProfileEditForm({ profile, onSave, onCancel, saving }) {
           <select
             value={formData.platform}
             onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-            className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
+            className="w-full bg-dark-700 border border-dark-600 px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
           >
             <option value="both">Both Platforms</option>
             <option value="instagram">Instagram Only</option>
@@ -649,9 +611,9 @@ function ProfileCreateModal({ onSave, onCancel, saving }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-dark-800 rounded-xl w-full max-w-md border border-dark-700">
+      <div className="bg-dark-800 w-full max-w-md border border-dark-700">
         <div className="p-6 border-b border-dark-700">
-          <h2 className="text-xl font-semibold text-dark-100">Create New Profile</h2>
+          <h2 className="text-lg font-medium text-dark-100">New Profile</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -664,7 +626,7 @@ function ProfileCreateModal({ onSave, onCancel, saving }) {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="e.g., My Business Account"
-              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
+              className="w-full bg-dark-700 border border-dark-600 px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
               required
               autoFocus
             />
@@ -679,7 +641,7 @@ function ProfileCreateModal({ onSave, onCancel, saving }) {
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               placeholder="@username"
-              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
+              className="w-full bg-dark-700 border border-dark-600 px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
             />
           </div>
 
@@ -692,7 +654,7 @@ function ProfileCreateModal({ onSave, onCancel, saving }) {
               onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
               rows={2}
               placeholder="Brief description of this profile"
-              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300 resize-none"
+              className="w-full bg-dark-700 border border-dark-600 px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300 resize-none"
             />
           </div>
 
@@ -703,7 +665,7 @@ function ProfileCreateModal({ onSave, onCancel, saving }) {
             <select
               value={formData.platform}
               onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
+              className="w-full bg-dark-700 border border-dark-600 px-3 py-2 text-dark-100 focus:outline-none focus:border-dark-300"
             >
               <option value="both">Both Platforms</option>
               <option value="instagram">Instagram Only</option>

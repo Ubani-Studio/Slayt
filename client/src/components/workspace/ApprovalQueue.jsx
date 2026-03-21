@@ -186,21 +186,21 @@ function ApprovalQueue({
                             className="approve-btn"
                             onClick={() => handleApprove(item._id)}
                           >
-                            ✓ Approve
+                            Approve
                           </button>
                           <button
                             type="button"
                             className="revision-btn"
                             onClick={() => handleRequestRevision(item._id)}
                           >
-                            ↻ Revision
+                            Revision
                           </button>
                           <button
                             type="button"
                             className="reject-btn"
                             onClick={() => handleReject(item._id)}
                           >
-                            ✕ Reject
+                            Reject
                           </button>
                         </div>
                         <button

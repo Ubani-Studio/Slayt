@@ -197,6 +197,8 @@ function YouTubeVideoDetails({
   const [showDescription, setShowDescription] = useState(true);
   const [showDescriptionTemplateEditor, setShowDescriptionTemplateEditor] = useState(false);
   const [collectionDescriptionTemplate, setCollectionDescriptionTemplate] = useState(() => getCollectionDescriptionTemplate(currentCollection));
+  const [showMetadata, setShowMetadata] = useState(true);
+  const [showIntelligence, setShowIntelligence] = useState(false);
 
   // Conviction scoring state
   const [scoringConviction, setScoringConviction] = useState(false);
@@ -375,7 +377,7 @@ function YouTubeVideoDetails({
 
   if (!video) {
     return (
-      <div className="h-full bg-dark-800 rounded-2xl border border-dark-700 p-6 flex flex-col items-center justify-center text-center">
+      <div className="h-full bg-dark-800 border border-dark-700/50 p-6 flex flex-col items-center justify-center text-center">
         <div className="w-16 h-16 mb-4 bg-dark-600/30 rounded-full flex items-center justify-center">
           <Youtube className="w-8 h-8 text-dark-300" />
         </div>
@@ -384,7 +386,7 @@ function YouTubeVideoDetails({
           Click on a video to view and edit its details
         </p>
         {videoClipboard?.payload && (
-          <div className="mt-5 w-full max-w-[240px] rounded-xl border border-dark-600 bg-dark-700/60 p-3 text-left">
+          <div className="mt-5 w-full max-w-[240px] border border-dark-600 bg-dark-700/60 p-3 text-left">
             <p className="text-xs text-dark-300 mb-1">
               {videoClipboard.mode === 'cut' ? 'Cut' : 'Copied'} video ready
             </p>
@@ -394,7 +396,7 @@ function YouTubeVideoDetails({
             <button
               type="button"
               onClick={() => onPasteVideo?.()}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-dark-100 hover:bg-white text-dark-900 rounded-lg text-xs font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-dark-200 hover:bg-white text-dark-900 text-xs font-medium transition-colors"
             >
               <ClipboardPaste className="w-3.5 h-3.5" />
               <span>Paste to {currentCollectionName || 'This Collection'}</span>
@@ -987,14 +989,14 @@ function YouTubeVideoDetails({
   }).slice(0, 8);
 
   return (
-    <div className="h-full bg-dark-800 rounded-2xl border border-dark-700 flex flex-col overflow-hidden">
+    <div className="h-full bg-dark-800 border border-dark-700/50 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-dark-700 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-dark-100">Video Details</h2>
+      <div className="px-4 py-3 border-b border-dark-700/50 flex items-center justify-between">
+        <h2 className="text-xs font-medium text-dark-300 tracking-wide uppercase">Details</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="p-1.5 text-dark-400 hover:text-dark-200 hover:bg-dark-700 rounded-lg transition-colors"
+            className="p-1.5 text-dark-400 hover:text-dark-200 hover:bg-dark-700 transition-colors"
             title="Delete video"
           >
             <Trash2 className="w-4 h-4" />
@@ -1003,9 +1005,9 @@ function YouTubeVideoDetails({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      <div className="flex-1 overflow-auto p-4 space-y-5">
         {/* Thumbnail Preview */}
-        <div className="relative aspect-video bg-black rounded-lg overflow-hidden group">
+        <div className="relative aspect-video bg-black overflow-hidden group">
           {video.thumbnail ? (
             <img
               src={video.thumbnail}
@@ -1022,12 +1024,12 @@ function YouTubeVideoDetails({
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
             <button
               onClick={() => setShowYoutubePreview(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors"
             >
               <Eye className="w-4 h-4 text-white" />
               <span className="text-white font-medium text-sm">Preview</span>
             </button>
-            <label className="flex items-center gap-2 px-4 py-2 bg-white/20 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors cursor-pointer">
+            <label className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors cursor-pointer">
               <Upload className="w-4 h-4 text-white" />
               <span className="text-white font-medium text-sm">
                 {video.thumbnail ? 'Replace' : 'Upload'}
@@ -1084,7 +1086,7 @@ function YouTubeVideoDetails({
         </div>
 
         {thumbnailWarning ? (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3">
+          <div className="border border-amber-500/30 bg-amber-500/10 px-3 py-3">
             <p className="text-xs font-medium text-amber-300">{thumbnailWarning.badgeLabel}</p>
             <p className="mt-1 text-xs text-amber-100/90">{thumbnailWarning.summary}</p>
             <p className="mt-2 text-xs text-amber-200/80">{thumbnailWarning.detail}</p>
@@ -1093,7 +1095,7 @@ function YouTubeVideoDetails({
                 href={thumbnailWarning.helpUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center rounded-lg bg-black/40 px-3 py-1.5 text-xs font-medium text-amber-100 transition-colors hover:bg-black/60"
+                className="inline-flex items-center bg-black/40 px-3 py-1.5 text-xs font-medium text-amber-100 transition-colors hover:bg-black/60"
               >
                 {thumbnailWarning.helpLabel}
               </a>
@@ -1103,20 +1105,20 @@ function YouTubeVideoDetails({
             </div>
           </div>
         ) : publishedWarning ? (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+          <div className="border border-amber-500/30 bg-amber-500/10 px-3 py-2">
             <p className="text-xs font-medium text-amber-300">Video uploaded with a warning</p>
             <p className="mt-1 text-xs text-amber-200/90">{publishedWarning}</p>
           </div>
         ) : null}
 
         {failedMessage && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2">
+          <div className="border border-red-500/30 bg-red-500/10 px-3 py-2">
             <p className="text-xs font-medium text-red-200">Upload failed</p>
             <p className="mt-1 text-xs text-red-200/90">{failedMessage}</p>
           </div>
         )}
 
-        <div className="inline-flex rounded-xl border border-dark-700 bg-dark-900/40 p-1">
+        <div className="inline-flex border border-dark-700 bg-dark-900/40 p-1">
           {['details', 'publish'].map((tab) => {
             const isActive = activePanelTab === tab;
             return (
@@ -1124,9 +1126,9 @@ function YouTubeVideoDetails({
                 key={tab}
                 type="button"
                 onClick={() => setActivePanelTab(tab)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   isActive
-                    ? 'bg-dark-100 text-dark-900'
+                    ? 'bg-dark-200 text-dark-900'
                     : 'text-dark-400 hover:text-dark-100'
                 }`}
               >
@@ -1138,7 +1140,7 @@ function YouTubeVideoDetails({
 
         {activePanelTab === 'publish' && (
           <>
-            <div className="relative rounded-2xl border border-dark-700 bg-dark-900/30 p-3">
+            <div className="relative border border-dark-700/50 bg-dark-900/30 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-dark-400">Release</p>
@@ -1156,7 +1158,7 @@ function YouTubeVideoDetails({
                     <button
                       type="button"
                       onClick={handleScheduleClear}
-                      className="rounded-lg px-2.5 py-1.5 text-xs text-dark-300 transition-colors hover:bg-dark-700 hover:text-dark-100"
+                      className="px-2.5 py-1.5 text-xs text-dark-300 transition-colors hover:bg-dark-700 hover:text-dark-100"
                     >
                       Clear
                     </button>
@@ -1164,19 +1166,19 @@ function YouTubeVideoDetails({
                   <button
                     type="button"
                     onClick={() => setShowSchedulePopover((current) => !current)}
-                    className="rounded-lg bg-dark-100 px-2.5 py-1.5 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
+                    className="bg-dark-200 px-2.5 py-1.5 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
                   >
                     {scheduledSummary ? 'Edit' : 'Schedule'}
                   </button>
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-col gap-2 rounded-xl border border-dark-700/60 bg-black/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-3 flex flex-col gap-2 border border-dark-700/60 bg-black/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-xs font-medium text-dark-400">Visibility</span>
                 <select
                   value={privacyStatus}
                   onChange={(event) => handleVisibilityChange(event.target.value)}
-                  className="w-full max-w-full appearance-none rounded-lg border border-dark-700/70 bg-black px-2.5 py-1.5 text-sm text-dark-100 focus:outline-none focus:border-dark-500 sm:w-[10rem] sm:flex-none"
+                  className="w-full max-w-full appearance-none border border-dark-700/70 bg-black px-2.5 py-1.5 text-sm text-dark-100 focus:outline-none focus:border-dark-500 sm:w-[10rem] sm:flex-none"
                   style={{ colorScheme: 'dark' }}
                   title="Choose how this video will appear on YouTube"
                 >
@@ -1203,7 +1205,7 @@ function YouTubeVideoDetails({
               />
             </div>
 
-            <div className="rounded-2xl border border-dark-700 bg-dark-900/30 p-3">
+            <div className="border border-dark-700/50 bg-dark-900/30 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-dark-400">End screen</p>
@@ -1219,7 +1221,7 @@ function YouTubeVideoDetails({
                     href={youtubeStudioUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-dark-100 px-2.5 py-1.5 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
+                    className="inline-flex items-center gap-1.5 bg-dark-200 px-2.5 py-1.5 text-xs font-medium text-dark-900 transition-colors hover:bg-white"
                     title="Open this video in YouTube Studio"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -1228,12 +1230,12 @@ function YouTubeVideoDetails({
                 )}
               </div>
 
-              <div className="mt-3 flex flex-col gap-2 rounded-xl border border-dark-700/60 bg-black/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-3 flex flex-col gap-2 border border-dark-700/60 bg-black/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-xs font-medium text-dark-400">Recipe</span>
                 <select
                   value={endScreenTemplate}
                   onChange={(event) => handleEndScreenTemplateChange(event.target.value)}
-                  className="w-full max-w-full appearance-none rounded-lg border border-dark-700/70 bg-black px-2.5 py-1.5 text-sm text-dark-100 focus:outline-none focus:border-dark-500 sm:w-[13rem] sm:flex-none"
+                  className="w-full max-w-full appearance-none border border-dark-700/70 bg-black px-2.5 py-1.5 text-sm text-dark-100 focus:outline-none focus:border-dark-500 sm:w-[13rem] sm:flex-none"
                   style={{ colorScheme: 'dark' }}
                   title="Choose which end-screen setup you plan to apply in YouTube Studio"
                 >
@@ -1254,7 +1256,7 @@ function YouTubeVideoDetails({
                   href={YOUTUBE_END_SCREENS_HELP_URL}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-dark-700 bg-black/30 px-3 py-1.5 text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-100"
+                  className="inline-flex items-center gap-1.5 border border-dark-700 bg-black/30 px-3 py-1.5 text-dark-200 transition-colors hover:border-dark-500 hover:text-dark-100"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   <span>Help</span>
@@ -1275,7 +1277,7 @@ function YouTubeVideoDetails({
           <button
             type="button"
             onClick={() => onCopyVideo?.(video)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-200 rounded-lg text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-300 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Copy className="w-3.5 h-3.5" />
             <span>Copy Video</span>
@@ -1283,7 +1285,7 @@ function YouTubeVideoDetails({
           <button
             type="button"
             onClick={() => onCutVideo?.(video)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-200 rounded-lg text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-300 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Scissors className="w-3.5 h-3.5" />
             <span>Cut Video</span>
@@ -1292,7 +1294,7 @@ function YouTubeVideoDetails({
             type="button"
             onClick={() => onPasteVideo?.()}
             disabled={!videoClipboard?.payload}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-100 hover:bg-white text-dark-900 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-200 hover:bg-white text-dark-900 text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <ClipboardPaste className="w-3.5 h-3.5" />
             <span>Paste to Collection</span>
@@ -1300,7 +1302,7 @@ function YouTubeVideoDetails({
         </div>
 
         {videoClipboard?.payload && (
-          <div className="rounded-lg border border-dark-600 bg-dark-700/60 px-3 py-2">
+          <div className="border border-dark-600 bg-dark-700/60 px-3 py-2">
             <p className="text-xs text-dark-300">
               {videoClipboard.mode === 'cut' ? 'Cut' : 'Copied'} video ready
               {videoClipboard.sourceCollectionName ? ` from ${videoClipboard.sourceCollectionName}` : ''}.
@@ -1313,7 +1315,7 @@ function YouTubeVideoDetails({
 
         {/* Video File Upload */}
         <div
-          className={`bg-dark-700 rounded-lg border transition-colors ${
+          className={`bg-dark-700 border transition-colors ${
             isDraggingVideoFile ? 'border-dark-100 bg-dark-650' : 'border-dark-600'
           }`}
           onDragEnter={handleVideoFileDragEnter}
@@ -1341,7 +1343,7 @@ function YouTubeVideoDetails({
             <div className="p-3 pt-0">
               <div className="relative">
                 {video.videoFileName ? (
-                  <div className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                  <div className={`flex items-center justify-between p-3 transition-colors ${
                     isDraggingVideoFile ? 'bg-dark-700' : 'bg-dark-800'
                   }`}>
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1351,7 +1353,7 @@ function YouTubeVideoDetails({
                         {assetState === 'processing' ? ' (processing)' : ''}
                       </span>
                     </div>
-                    <label className="ml-2 px-3 py-1.5 bg-dark-700 hover:bg-dark-600 rounded-lg transition-colors cursor-pointer flex-shrink-0">
+                    <label className="ml-2 px-3 py-1.5 bg-dark-700 hover:bg-dark-600 transition-colors cursor-pointer flex-shrink-0">
                       <span className="text-xs text-dark-300">Replace</span>
                       <input
                         ref={videoFileInputRef}
@@ -1364,14 +1366,14 @@ function YouTubeVideoDetails({
                     <button
                       type="button"
                       onClick={handleRemoveVideoAttachment}
-                      className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-dark-700 text-dark-300 transition-colors hover:bg-dark-600 hover:text-dark-100"
+                      className="ml-2 inline-flex h-8 w-8 items-center justify-center bg-dark-700 text-dark-300 transition-colors hover:bg-dark-600 hover:text-dark-100"
                       title="Remove uploaded video"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
-                  <label className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors cursor-pointer group ${
+                  <label className={`flex flex-col items-center justify-center p-6 border-2 border-dashed transition-colors cursor-pointer group ${
                     isDraggingVideoFile
                       ? 'border-dark-100 bg-dark-700/70'
                       : 'border-dark-600 hover:border-dark-500/50 hover:bg-dark-600/50'
@@ -1400,7 +1402,7 @@ function YouTubeVideoDetails({
                 )}
 
                 {videoUploadProgress && (
-                  <div className={`mt-3 rounded-lg border px-3 py-2 ${
+                  <div className={`mt-3 border px-3 py-2 ${
                     videoUploadProgress.phase === 'error'
                       ? 'border-red-500/30 bg-red-500/10'
                       : 'border-dark-600 bg-dark-800/80'
@@ -1445,7 +1447,7 @@ function YouTubeVideoDetails({
                 )}
 
                 {isDraggingVideoFile && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-dark-100 bg-dark-900/90 backdrop-blur-sm">
+                  <div className="absolute inset-0 z-10 flex items-center justify-center border-2 border-dashed border-dark-100 bg-dark-900/90 backdrop-blur-sm">
                     <div className="text-center px-4">
                       <Upload className="w-8 h-8 text-dark-100 mx-auto mb-2" />
                       <p className="text-sm font-semibold text-dark-100">
@@ -1466,7 +1468,18 @@ function YouTubeVideoDetails({
           )}
         </div>
 
-        {/* Artist Name */}
+        {/* Metadata — Artist & Featuring */}
+        <div className="border-t border-dark-700/40 pt-3">
+          <button
+            onClick={() => setShowMetadata(!showMetadata)}
+            className="w-full flex items-center justify-between mb-2"
+          >
+            <span className="text-xs font-medium text-dark-400 tracking-wide">Metadata</span>
+            <ChevronDown className={`w-3.5 h-3.5 text-dark-500 transition-transform ${showMetadata ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showMetadata && (
+          <div className="space-y-4">
         <div className="relative">
           <label className="flex items-center gap-2 text-xs font-medium text-dark-400 mb-1.5">
             Artist
@@ -1502,7 +1515,7 @@ function YouTubeVideoDetails({
               : uniqueNames;
             if (filtered.length === 0) return null;
             return (
-              <div className="absolute z-20 left-0 right-0 mt-1 bg-dark-800 border border-dark-600 rounded-lg shadow-xl overflow-hidden max-h-32 overflow-y-auto">
+              <div className="absolute z-20 left-0 right-0 mt-1 bg-dark-800 border border-dark-600 shadow-xl overflow-hidden max-h-32 overflow-y-auto">
                 {filtered.map((name) => (
                   <button
                     key={name}
@@ -1539,7 +1552,7 @@ function YouTubeVideoDetails({
           <label className="flex items-center gap-2 text-xs font-medium text-dark-400 mb-1.5">
             Featuring
           </label>
-          <div className="rounded-xl border border-dark-700 bg-dark-900/40 px-2 py-2">
+          <div className="border border-dark-700 bg-dark-900/40 px-2 py-2">
             <div className="flex flex-wrap items-center gap-2">
               {featuringArtists.map((name) => (
                 <span
@@ -1579,7 +1592,7 @@ function YouTubeVideoDetails({
             </div>
           </div>
           {showFeaturingSuggestions && featuringSuggestions.length > 0 && (
-            <div className="absolute z-20 left-0 right-0 mt-1 bg-dark-800 border border-dark-600 rounded-lg shadow-xl overflow-hidden max-h-36 overflow-y-auto">
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-dark-800 border border-dark-600 shadow-xl overflow-hidden max-h-36 overflow-y-auto">
               {featuringSuggestions.map((name) => (
                 <button
                   key={name}
@@ -1604,17 +1617,17 @@ function YouTubeVideoDetails({
             </div>
           )}
           <p className="mt-1 text-xs text-dark-500">
-            Press Enter or comma to add names. This stays in Slayt metadata for planning and credits.
+            Press Enter or comma to add names.
           </p>
+        </div>
+          </div>
+          )}
         </div>
 
         {/* Title */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-dark-200">
-              <Type className="w-4 h-4" />
-              Title
-            </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-medium text-dark-400">Title</label>
             <button
               onClick={() => setShowTruncatePreview(!showTruncatePreview)}
               className={`flex items-center gap-1 text-xs transition-colors ${
@@ -1633,7 +1646,7 @@ function YouTubeVideoDetails({
             onChange={(e) => handleTitleChange(e.target.value)}
             onBlur={handleTitleBlur}
             placeholder="Enter video title..."
-            className="input w-full"
+            className="input w-full text-sm"
             maxLength={TITLE_MAX}
           />
 
@@ -1659,7 +1672,7 @@ function YouTubeVideoDetails({
 
           {/* Truncated Preview */}
           {showTruncatePreview && isTitleLong && (
-            <div className="mt-2 p-3 bg-dark-700 rounded-lg">
+            <div className="mt-2 p-3 bg-dark-700">
               <p className="text-xs text-dark-400 mb-1">How it appears in search results:</p>
               <p className="text-sm text-dark-100">{truncatedTitle}</p>
             </div>
@@ -1673,23 +1686,20 @@ function YouTubeVideoDetails({
               onClick={() => setShowDescription(!showDescription)}
               className="min-w-0 flex flex-1 items-center justify-between hover:opacity-80 transition-opacity"
             >
-              <label className="flex items-center gap-2 text-sm font-medium text-dark-200 cursor-pointer">
-                <FileText className="w-4 h-4" />
-                Description
-              </label>
-              <ChevronDown className={`w-4 h-4 text-dark-400 transition-transform ${showDescription ? 'rotate-180' : ''}`} />
+              <label className="text-xs font-medium text-dark-400 cursor-pointer">Description</label>
+              <ChevronDown className={`w-3.5 h-3.5 text-dark-500 transition-transform ${showDescription ? 'rotate-180' : ''}`} />
             </button>
             <button
               type="button"
               onClick={() => applyCollectionDescriptionTemplate()}
-              className="shrink-0 rounded-lg border border-dark-600 bg-dark-700 px-3 py-1.5 text-xs font-medium text-dark-200 transition-colors hover:bg-dark-600 hover:text-dark-100"
+              className="shrink-0 border border-dark-600 bg-dark-700 px-3 py-1.5 text-xs font-medium text-dark-300 transition-colors hover:bg-dark-600 hover:text-dark-100"
             >
               {description.trim() ? 'Regenerate from template' : 'Apply template'}
             </button>
           </div>
           {showDescription && (
             <div className="space-y-3">
-              <div className="rounded-xl border border-dark-700/70 bg-dark-900/40 px-3 py-3">
+              <div className="border border-dark-700/70 bg-dark-900/40 px-3 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-dark-300">Collection template</p>
@@ -1700,7 +1710,7 @@ function YouTubeVideoDetails({
                   <button
                     type="button"
                     onClick={() => setShowDescriptionTemplateEditor((current) => !current)}
-                    className="shrink-0 rounded-lg border border-dark-700 bg-black/30 px-3 py-1.5 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
+                    className="shrink-0 border border-dark-700 bg-black/30 px-3 py-1.5 text-xs text-dark-300 transition-colors hover:border-dark-500 hover:text-dark-100"
                   >
                     {showDescriptionTemplateEditor ? 'Hide template' : 'Edit template'}
                   </button>
@@ -1740,45 +1750,58 @@ function YouTubeVideoDetails({
           )}
         </div>
 
-        {/* Taste Feedback */}
+        {/* Taste Feedback — compact inline */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-dark-400">Feedback to Taste Genome:</span>
+          <span className="text-xs text-dark-500">Taste signal</span>
           <button
             type="button"
             onClick={() => sendTasteSignal('dislike', 'dislike')}
             disabled={sendingFeedback}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-xs text-white disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2 py-1 bg-dark-700 hover:bg-dark-600 text-xs text-dark-300 disabled:opacity-50"
             title="Dislike this suggestion"
           >
-            <ThumbsDown className="w-3.5 h-3.5" />
+            <ThumbsDown className="w-3 h-3" />
             Dislike
           </button>
           <button
             type="button"
             onClick={() => sendTasteSignal('skip', 'skip')}
             disabled={sendingFeedback}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-xs text-white disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2 py-1 bg-dark-700 hover:bg-dark-600 text-xs text-dark-300 disabled:opacity-50"
             title="Skip this video"
           >
-            <SkipForward className="w-3.5 h-3.5" />
+            <SkipForward className="w-3 h-3" />
             Skip
           </button>
         </div>
           </>
         )}
 
+        {/* Intelligence — AI, Status, Conviction */}
+        <div className="border-t border-dark-700/40 pt-3">
+          <button
+            onClick={() => setShowIntelligence(!showIntelligence)}
+            className="w-full flex items-center justify-between mb-2"
+          >
+            <span className="text-xs font-medium text-dark-400 tracking-wide">Intelligence</span>
+            <ChevronDown className={`w-3.5 h-3.5 text-dark-500 transition-transform ${showIntelligence ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showIntelligence && (
+          <div className="space-y-4">
+
         {/* AI Generation */}
-        <div className="border-t border-dark-700 pt-4">
+        <div>
           <button
             onClick={() => setShowAIPanel(!showAIPanel)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-dark-700 hover:bg-dark-600 border border-dark-600 rounded-lg transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 bg-dark-700 hover:bg-dark-600 border border-dark-600 transition-colors"
           >
-            <span className="text-sm font-medium text-dark-200">AI Generate</span>
-            <ChevronDown className={`w-4 h-4 text-dark-400 transition-transform ${showAIPanel ? 'rotate-180' : ''}`} />
+            <span className="text-xs font-medium text-dark-300">AI Generate</span>
+            <ChevronDown className={`w-3.5 h-3.5 text-dark-400 transition-transform ${showAIPanel ? 'rotate-180' : ''}`} />
           </button>
 
           {showAIPanel && (
-            <div className="mt-2 p-3 bg-dark-750 rounded-lg space-y-2">
+            <div className="mt-2 p-3 bg-dark-750 space-y-2">
               <input
                 type="text"
                 value={aiTopic}
@@ -1802,7 +1825,7 @@ function YouTubeVideoDetails({
                 <button
                   onClick={() => handleGenerateAI()}
                   disabled={generating || (!aiTopic.trim() && !title && !description)}
-                  className="px-3 py-1.5 bg-dark-600 hover:bg-dark-500 text-dark-200 rounded-lg transition-colors disabled:opacity-50 text-sm font-medium"
+                  className="px-3 py-1.5 bg-dark-600 hover:bg-dark-500 text-dark-300 transition-colors disabled:opacity-50 text-sm font-medium"
                 >
                   {generating ? 'Generating...' : 'Generate'}
                 </button>
@@ -1815,13 +1838,13 @@ function YouTubeVideoDetails({
                   {aiVariants.map((variant, i) => (
                     <div
                       key={i}
-                      className="p-2 bg-dark-700 hover:bg-dark-600 rounded border border-dark-600 hover:border-dark-500 transition-colors cursor-pointer"
+                      className="p-2 bg-dark-700 hover:bg-dark-600 border border-dark-600 hover:border-dark-500 transition-colors cursor-pointer"
                       onClick={() => applyAIVariant(variant)}
                     >
                       <p className="text-sm text-dark-100 font-medium mb-0.5 line-clamp-1">{variant.title}</p>
                       <p className="text-xs text-dark-400 line-clamp-1">{variant.description}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="px-1.5 py-0.5 bg-dark-600 text-dark-300 rounded text-xs">
+                        <span className="px-1.5 py-0.5 bg-dark-600 text-dark-300 text-xs">
                           {variant.hookType}
                         </span>
                         <span className="text-xs text-dark-500">{variant.performanceScore}%</span>
@@ -1836,19 +1859,16 @@ function YouTubeVideoDetails({
 
         {/* Status */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-dark-200 mb-2">
-            <Clock className="w-4 h-4" />
-            Status
-          </label>
-          <div className="flex gap-2">
+          <label className="text-xs font-medium text-dark-300 mb-1.5 block">Status</label>
+          <div className="flex gap-1">
             {STATUS_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => handleStatusChange(opt.value)}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
                   status === opt.value
                     ? `${opt.color} text-white`
-                    : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                    : 'bg-dark-700 text-dark-400 hover:bg-dark-600 hover:text-dark-200'
                 }`}
               >
                 {opt.label}
@@ -1858,16 +1878,15 @@ function YouTubeVideoDetails({
         </div>
 
         {/* Conviction Score */}
-        <div className="border-t border-dark-700 pt-4">
+        <div>
           <div className="flex items-center justify-between mb-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-dark-200">
-              <Shield className="w-4 h-4" />
+            <label className="flex items-center gap-2 text-xs font-medium text-dark-300">
               Conviction
             </label>
             <button
               onClick={handleScoreConviction}
               disabled={scoringConviction}
-              className="px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-200 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-300 text-xs font-medium transition-colors disabled:opacity-50"
             >
               {scoringConviction ? 'Scoring...' : video.conviction?.score != null ? 'Re-score' : 'Score'}
             </button>
@@ -1907,7 +1926,7 @@ function YouTubeVideoDetails({
                     { label: 'Title', value: video.conviction.breakdown.title, weight: '35%' },
                     { label: 'Description', value: video.conviction.breakdown.description, weight: '20%' },
                   ].map(({ label, value, weight }) => (
-                    <div key={label} className="bg-dark-700 rounded-lg p-2 text-center">
+                    <div key={label} className="bg-dark-700 p-2 text-center">
                       <div className="text-lg font-semibold text-dark-100">{value ?? '—'}</div>
                       <div className="text-[10px] text-dark-400">{label}</div>
                       <div className="text-[10px] text-dark-500">{weight}</div>
@@ -1931,7 +1950,7 @@ function YouTubeVideoDetails({
               {(video.conviction.gatingStatus === 'blocked' || video.conviction.gatingStatus === 'warning') && !video.conviction.userOverride && (
                 <button
                   onClick={handleOverrideConviction}
-                  className="w-full px-3 py-2 bg-dark-700 hover:bg-dark-600 text-dark-300 hover:text-dark-100 rounded-lg text-xs transition-colors"
+                  className="w-full px-3 py-2 bg-dark-700 hover:bg-dark-600 text-dark-300 hover:text-dark-100 text-xs transition-colors"
                 >
                   Override gating — I know what I'm doing
                 </button>
@@ -1944,12 +1963,16 @@ function YouTubeVideoDetails({
           )}
         </div>
 
+          </div>
+          )}
+        </div>
+
       </div>
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-dark-800 rounded-xl border border-dark-700 w-full max-w-sm mx-4 p-4">
+          <div className="bg-dark-800 border border-dark-700/50 w-full max-w-sm mx-4 p-4">
             <h3 className="text-lg font-semibold text-dark-100 mb-2">Delete Video</h3>
             <p className="text-dark-400 text-sm mb-4">
               Are you sure you want to delete "{title || 'this video'}"? This cannot be undone.
@@ -1963,7 +1986,7 @@ function YouTubeVideoDetails({
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 px-4 py-2 bg-dark-600/30 text-dark-300 rounded-lg hover:bg-dark-600/40 transition-colors"
+                className="flex-1 px-4 py-2 bg-dark-600/30 text-dark-300 hover:bg-dark-600/40 transition-colors"
               >
                 Delete
               </button>

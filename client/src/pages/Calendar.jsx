@@ -553,12 +553,12 @@ function Calendar() {
 
         <div className="flex items-center gap-1.5">
           {/* View Toggle */}
-          <div className="flex items-center gap-0.5 p-0.5 bg-dark-800 rounded-lg">
+          <div className="flex items-center gap-0.5 p-0.5 bg-dark-800">
             {['day', 'week', 'month', 'year'].map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-2.5 py-1 text-xs rounded-md transition-colors capitalize ${
+                className={`px-2.5 py-1 text-xs transition-colors capitalize ${
                   view === v
                     ? 'bg-dark-100 text-dark-900'
                     : 'text-dark-400 hover:text-dark-200'
@@ -599,7 +599,7 @@ function Calendar() {
 
       {/* Error State */}
       {error && (
-        <div className="mb-2 px-3 py-2 bg-dark-700/50 border border-dark-600 rounded-lg text-dark-300 text-xs">
+        <div className="mb-2 px-3 py-2 bg-dark-700/50 border border-dark-600 text-dark-300 text-xs">
           {error}
           <button onClick={fetchScheduledPosts} className="ml-3 underline">
             Retry
@@ -608,7 +608,7 @@ function Calendar() {
       )}
 
       {/* Calendar Views */}
-      <div className="flex-1 bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+      <div className="flex-1 bg-dark-800 border border-dark-700 overflow-hidden">
 
         {/* ── MONTH VIEW ── */}
         {view === 'month' && (
@@ -635,12 +635,12 @@ function Calendar() {
                     onClick={() => handleDayClick(day.date)}
                     className={`min-h-[88px] border-b border-r border-dark-700/60 px-1.5 py-1 transition-colors hover:bg-dark-700/40 cursor-pointer relative group ${
                       !day.isCurrentMonth ? 'bg-dark-900/40' : ''
-                    } ${isTodayCell ? 'bg-accent-purple/8' : ''} ${hasBoost && !isTodayCell ? 'bg-green-900/8' : ''} ${hasAvoid && !isTodayCell ? 'bg-amber-900/10' : ''}`}
+                    } ${isTodayCell ? 'bg-dark-100/5' : ''} ${hasBoost && !isTodayCell ? 'bg-green-900/8' : ''} ${hasAvoid && !isTodayCell ? 'bg-amber-900/10' : ''}`}
                   >
                     {/* Seasonal window tooltip */}
                     {daySeasonalWindows.length > 0 && (
                       <div className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block pointer-events-none">
-                        <div className="bg-dark-900 border border-dark-600 rounded px-2 py-1.5 shadow-lg whitespace-nowrap">
+                        <div className="bg-dark-900 border border-dark-600 px-2 py-1.5 shadow-lg whitespace-nowrap">
                           {daySeasonalWindows.slice(0, 2).map((w, i) => (
                             <div key={i} className="text-[10px] text-dark-300">
                               {w.label} <span className={w.isAvoid ? 'text-dark-500' : 'text-dark-200'}>{w.boost}x</span>
@@ -650,25 +650,25 @@ function Calendar() {
                       </div>
                     )}
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className={`text-xs leading-none ${!day.isCurrentMonth ? 'text-dark-600' : isTodayCell ? 'text-accent-purple font-semibold' : 'text-dark-400'}`}>
+                      <span className={`text-xs leading-none ${!day.isCurrentMonth ? 'text-dark-600' : isTodayCell ? 'text-dark-100 font-semibold' : 'text-dark-400'}`}>
                         {day.day}
                       </span>
                       <div className="flex items-center gap-0.5">
                         {hasBoost && <span className="w-1.5 h-1.5 rounded-full bg-green-700/60" title="Boost window" />}
                         {hasAvoid && <span className="w-1.5 h-1.5 rounded-full bg-amber-700/60" title="Avoid zone" />}
-                        {isTodayCell && <span className="text-[9px] bg-accent-purple text-white px-1 py-px rounded font-medium">Today</span>}
+                        {isTodayCell && <span className="text-[9px] bg-dark-100 text-dark-900 px-1 py-px font-medium">Today</span>}
                       </div>
                     </div>
                     <div className="space-y-0.5">
                       {dayRolloutEvents.slice(0, 2).map((event) => (
-                        <div key={event.id} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 px-1 py-0.5 rounded text-[10px] truncate" style={{ backgroundColor: `${event.color}15`, borderLeft: `2px solid ${event.color}` }}>
+                        <div key={event.id} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 px-1 py-0.5 text-[10px] truncate" style={{ backgroundColor: `${event.color}15`, borderLeft: `2px solid ${event.color}` }}>
                           {event.type.includes('start') ? <Flag className="w-2.5 h-2.5 flex-shrink-0" style={{ color: event.color }} /> : <Target className="w-2.5 h-2.5 flex-shrink-0" style={{ color: event.color }} />}
                           <span className="truncate flex-1" style={{ color: event.color }}>{event.type.includes('section') ? event.sectionName : event.rolloutName}</span>
                         </div>
                       ))}
                       {posts.slice(0, dayRolloutEvents.length > 1 ? 1 : 2).map((post) => (
-                        <div key={post.id} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 px-1 py-0.5 rounded text-[10px] truncate cursor-pointer hover:bg-dark-600 bg-dark-700/60">
-                          {post.image ? <img src={post.image} alt="" className="w-4 h-4 rounded-sm object-cover flex-shrink-0" /> : <div className="w-4 h-4 rounded-sm flex-shrink-0" style={{ backgroundColor: post.color }} />}
+                        <div key={post.id} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 px-1 py-0.5 text-[10px] truncate cursor-pointer hover:bg-dark-600 bg-dark-700/60">
+                          {post.image ? <img src={post.image} alt="" className="w-4 h-4 object-cover flex-shrink-0" /> : <div className="w-4 h-4 flex-shrink-0" style={{ backgroundColor: post.color }} />}
                           <span className="text-dark-300 truncate flex-1">{post.caption?.slice(0, 16) || 'Untitled'}</span>
                           <Clock className="w-2.5 h-2.5 text-dark-500" />
                         </div>
@@ -687,9 +687,9 @@ function Calendar() {
           <>
             <div className="grid grid-cols-7 border-b border-dark-700">
               {weekDays.map((wd, i) => (
-                <div key={i} className={`py-1.5 text-center border-r border-dark-700/60 last:border-r-0 ${isToday(wd.date) ? 'bg-accent-purple/8' : ''}`}>
+                <div key={i} className={`py-1.5 text-center border-r border-dark-700/60 last:border-r-0 ${isToday(wd.date) ? 'bg-dark-100/5' : ''}`}>
                   <div className="text-[10px] font-medium text-dark-500 uppercase tracking-wider">{DAYS[i]}</div>
-                  <div className={`text-sm font-medium mt-0.5 ${isToday(wd.date) ? 'text-accent-purple' : 'text-dark-300'}`}>{wd.day}</div>
+                  <div className={`text-sm font-medium mt-0.5 ${isToday(wd.date) ? 'text-dark-100' : 'text-dark-300'}`}>{wd.day}</div>
                 </div>
               ))}
             </div>
@@ -698,17 +698,17 @@ function Calendar() {
                 const posts = getPostsForDay(wd.date);
                 const dayRolloutEvents = getRolloutEventsForDay(wd.date);
                 return (
-                  <div key={i} onClick={() => handleDayClick(wd.date)} className={`border-r border-dark-700/60 last:border-r-0 p-1.5 min-h-[200px] cursor-pointer hover:bg-dark-700/30 transition-colors ${isToday(wd.date) ? 'bg-accent-purple/5' : ''}`}>
+                  <div key={i} onClick={() => handleDayClick(wd.date)} className={`border-r border-dark-700/60 last:border-r-0 p-1.5 min-h-[200px] cursor-pointer hover:bg-dark-700/30 transition-colors ${isToday(wd.date) ? 'bg-dark-100/5' : ''}`}>
                     <div className="space-y-1">
                       {dayRolloutEvents.map((event) => (
-                        <div key={event.id} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 px-1.5 py-1 rounded text-[11px]" style={{ backgroundColor: `${event.color}15`, borderLeft: `2px solid ${event.color}` }}>
+                        <div key={event.id} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 px-1.5 py-1 text-[11px]" style={{ backgroundColor: `${event.color}15`, borderLeft: `2px solid ${event.color}` }}>
                           {event.type.includes('start') ? <Flag className="w-3 h-3 flex-shrink-0" style={{ color: event.color }} /> : <Target className="w-3 h-3 flex-shrink-0" style={{ color: event.color }} />}
                           <span className="truncate" style={{ color: event.color }}>{event.type.includes('section') ? event.sectionName : event.rolloutName}</span>
                         </div>
                       ))}
                       {posts.map((post) => (
-                        <div key={post.id} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 px-1.5 py-1 rounded text-[11px] bg-dark-700/60 hover:bg-dark-600 cursor-pointer">
-                          {post.image ? <img src={post.image} alt="" className="w-5 h-5 rounded-sm object-cover flex-shrink-0" /> : <div className="w-5 h-5 rounded-sm flex-shrink-0" style={{ backgroundColor: post.color }} />}
+                        <div key={post.id} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 px-1.5 py-1 text-[11px] bg-dark-700/60 hover:bg-dark-600 cursor-pointer">
+                          {post.image ? <img src={post.image} alt="" className="w-5 h-5 object-cover flex-shrink-0" /> : <div className="w-5 h-5 flex-shrink-0" style={{ backgroundColor: post.color }} />}
                           <div className="min-w-0 flex-1">
                             <div className="text-dark-300 truncate">{post.caption?.slice(0, 24) || 'Untitled'}</div>
                             <div className="text-[9px] text-dark-500">{new Date(post.scheduledAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
@@ -761,14 +761,14 @@ function Calendar() {
                   <div className="flex-1 border-l border-dark-700/60 px-2 py-1 cursor-pointer" onClick={() => handleDayClick(currentDate)}>
                     <div className="space-y-0.5">
                       {hourRollouts.map((event) => (
-                        <div key={event.id} className="flex items-center gap-1.5 px-2 py-1 rounded text-xs" style={{ backgroundColor: `${event.color}15`, borderLeft: `2px solid ${event.color}` }}>
+                        <div key={event.id} className="flex items-center gap-1.5 px-2 py-1 text-xs" style={{ backgroundColor: `${event.color}15`, borderLeft: `2px solid ${event.color}` }}>
                           {event.type.includes('start') ? <Flag className="w-3 h-3" style={{ color: event.color }} /> : <Target className="w-3 h-3" style={{ color: event.color }} />}
                           <span style={{ color: event.color }}>{event.type.includes('section') ? event.sectionName : event.rolloutName}</span>
                         </div>
                       ))}
                       {hourPosts.map((post) => (
-                        <div key={post.id} className="flex items-center gap-2 px-2 py-1.5 rounded bg-dark-700/60 hover:bg-dark-600 cursor-pointer">
-                          {post.image ? <img src={post.image} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" /> : <div className="w-8 h-8 rounded flex-shrink-0" style={{ backgroundColor: post.color }} />}
+                        <div key={post.id} className="flex items-center gap-2 px-2 py-1.5 bg-dark-700/60 hover:bg-dark-600 cursor-pointer">
+                          {post.image ? <img src={post.image} alt="" className="w-8 h-8 object-cover flex-shrink-0" /> : <div className="w-8 h-8 flex-shrink-0" style={{ backgroundColor: post.color }} />}
                           <div className="min-w-0 flex-1">
                             <div className="text-xs text-dark-200 truncate">{post.caption?.slice(0, 40) || 'Untitled'}</div>
                             <div className="text-[10px] text-dark-500">{new Date(post.scheduledAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
@@ -816,8 +816,8 @@ function Calendar() {
                       return (
                         <div
                           key={i}
-                          className={`h-3.5 flex items-center justify-center text-[8px] rounded-sm ${
-                            isTd ? 'bg-accent-purple text-white font-semibold' : hasPost ? 'bg-dark-600 text-dark-200' : 'text-dark-500'
+                          className={`h-3.5 flex items-center justify-center text-[8px] ${
+                            isTd ? 'bg-dark-100 text-dark-900 font-semibold' : hasPost ? 'bg-dark-600 text-dark-200' : 'text-dark-500'
                           }`}
                         >
                           {d.getDate()}
@@ -881,7 +881,7 @@ function Calendar() {
         {showLegend && (
           <div className="flex items-center gap-3 text-[10px] text-dark-500">
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-dark-700 rounded-sm flex items-center justify-center">
+              <div className="w-3 h-3 bg-dark-700 flex items-center justify-center">
                 <Image className="w-2 h-2" />
               </div>
               <span>Post</span>
@@ -896,7 +896,7 @@ function Calendar() {
             </div>
             <button
               onClick={() => setShowSeasonalMarkers(!showSeasonalMarkers)}
-              className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${showSeasonalMarkers ? 'bg-dark-700/60 text-dark-300' : 'text-dark-600'}`}
+              className={`flex items-center gap-1 px-1.5 py-0.5 ${showSeasonalMarkers ? 'bg-dark-700/60 text-dark-300' : 'text-dark-600'}`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-green-700/60" />
               <span>Seasons</span>
@@ -914,7 +914,7 @@ function Calendar() {
       {/* Multi-Tab Schedule Modal */}
       {showScheduleModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-dark-800 rounded-2xl border border-dark-700 w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-dark-800 border border-dark-700 w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-dark-700">
               <div>
@@ -992,7 +992,7 @@ function Calendar() {
                           <button
                             key={content._id || content.id}
                             onClick={() => setSelectedContent(content)}
-                            className={`aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
+                            className={`aspect-square overflow-hidden border-2 transition-colors ${
                               selectedContent?._id === content._id || selectedContent?.id === content.id
                                 ? 'border-dark-100'
                                 : 'border-transparent hover:border-dark-500'
@@ -1038,7 +1038,7 @@ function Calendar() {
                         <button
                           key={platform}
                           onClick={() => togglePlatform(platform)}
-                          className={`px-3 py-1.5 rounded-lg text-sm capitalize transition-colors ${
+                          className={`px-3 py-1.5 text-sm capitalize transition-colors ${
                             selectedPlatforms.includes(platform)
                               ? 'bg-dark-100 text-dark-900'
                               : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
@@ -1070,13 +1070,13 @@ function Calendar() {
                           <button
                             key={collection.id}
                             onClick={() => setSelectedCollection(collection)}
-                            className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-colors ${
+                            className={`flex items-center gap-3 p-3 border-2 text-left transition-colors ${
                               selectedCollection?.id === collection.id
                                 ? 'border-dark-100 bg-dark-600/50'
                                 : 'border-dark-600 hover:border-dark-500'
                             }`}
                           >
-                            <div className="w-8 h-8 rounded bg-dark-600 flex items-center justify-center">
+                            <div className="w-8 h-8 bg-dark-600 flex items-center justify-center">
                               {collection.platform === 'youtube' && <Youtube className="w-4 h-4 text-dark-300" />}
                               {collection.platform === 'instagram' && <Instagram className="w-4 h-4 text-pink-400" />}
                               {collection.platform === 'tiktok' && <TikTokIcon className="w-4 h-4 text-cyan-400" />}
@@ -1138,7 +1138,7 @@ function Calendar() {
                         <button
                           key={interval.id}
                           onClick={() => setPostingInterval(interval.id)}
-                          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                          className={`px-3 py-1.5 text-sm transition-colors ${
                             postingInterval === interval.id
                               ? 'bg-dark-100 text-dark-900'
                               : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
@@ -1181,7 +1181,7 @@ function Calendar() {
                         <button
                           key={platform}
                           onClick={() => togglePlatform(platform)}
-                          className={`px-3 py-1.5 rounded-lg text-sm capitalize transition-colors ${
+                          className={`px-3 py-1.5 text-sm capitalize transition-colors ${
                             selectedPlatforms.includes(platform)
                               ? 'bg-dark-100 text-dark-900'
                               : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
@@ -1213,20 +1213,20 @@ function Calendar() {
                           <button
                             key={rollout._id || rollout.id}
                             onClick={() => setSelectedRollout(rollout)}
-                            className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-colors ${
+                            className={`w-full flex items-center gap-3 p-3 border-2 text-left transition-colors ${
                               selectedRollout?._id === rollout._id || selectedRollout?.id === rollout.id
                                 ? 'border-dark-100 bg-dark-600/50'
                                 : 'border-dark-600 hover:border-dark-500'
                             }`}
                           >
-                            <div className="w-10 h-10 rounded-lg bg-dark-600 flex items-center justify-center">
+                            <div className="w-10 h-10 bg-dark-600 flex items-center justify-center">
                               <Layers className="w-5 h-5 text-dark-100" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-white">{rollout.name}</div>
                               <div className="text-xs text-dark-400">
                                 {rollout.sections?.length || 0} sections
-                                <span className={`ml-2 px-1.5 py-0.5 rounded ${
+                                <span className={`ml-2 px-1.5 py-0.5 ${
                                   rollout.status === 'active'
                                     ? 'bg-dark-600/30 text-dark-100'
                                     : rollout.status === 'completed'
@@ -1274,13 +1274,13 @@ function Calendar() {
                   </div>
 
                   {/* Activate Toggle */}
-                  <div className="flex items-center gap-3 p-3 bg-dark-700 rounded-lg">
+                  <div className="flex items-center gap-3 p-3 bg-dark-700">
                     <input
                       type="checkbox"
                       id="activateRollout"
                       checked={activateRollout}
                       onChange={(e) => setActivateRollout(e.target.checked)}
-                      className="w-4 h-4 rounded border-dark-500"
+                      className="w-4 h-4 border-dark-500"
                     />
                     <label htmlFor="activateRollout" className="text-sm text-dark-200">
                       Activate rollout immediately
@@ -1289,7 +1289,7 @@ function Calendar() {
 
                   {/* Section deadlines info */}
                   {selectedRollout && selectedRollout.sections?.length > 0 && (
-                    <div className="text-xs text-dark-400 p-3 bg-dark-700/50 rounded-lg">
+                    <div className="text-xs text-dark-400 p-3 bg-dark-700/50">
                       <p className="mb-2">Sections in this rollout:</p>
                       <ul className="space-y-1">
                         {selectedRollout.sections.map((section) => (
@@ -1318,7 +1318,7 @@ function Calendar() {
 
             {/* Conviction Gating Warning */}
             {convictionGatingWarning && (
-              <div className="mx-4 mb-4 p-4 bg-dark-700/50 border border-dark-600 rounded-lg">
+              <div className="mx-4 mb-4 p-4 bg-dark-700/50 border border-dark-600">
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
                     <ConvictionBadge score={convictionGatingWarning.score} size="md" />
@@ -1329,7 +1329,7 @@ function Calendar() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => setConvictionGatingWarning(null)}
-                        className="px-3 py-1.5 text-sm bg-dark-700 hover:bg-dark-600 text-dark-200 rounded"
+                        className="px-3 py-1.5 text-sm bg-dark-700 hover:bg-dark-600 text-dark-200"
                       >
                         Review Content
                       </button>
@@ -1342,7 +1342,7 @@ function Calendar() {
                           setShowScheduleModal(false);
                           fetchScheduledPosts();
                         }}
-                        className="px-3 py-1.5 text-sm bg-dark-100 hover:bg-white text-dark-900 text-white rounded"
+                        className="px-3 py-1.5 text-sm bg-dark-100 hover:bg-white text-dark-900 text-white"
                       >
                         Schedule Anyway
                       </button>

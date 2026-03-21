@@ -37,7 +37,7 @@ export default function RolloutIntelligencePanel({ rolloutId, rollout }) {
 
   if (loading) {
     return (
-      <div className="bg-dark-800 border border-dark-700 rounded-xl p-3">
+      <div className="bg-dark-800 border border-dark-700 p-3">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 border-2 border-dark-100 border-t-transparent rounded-full animate-spin" />
           <span className="text-dark-400 text-sm">Analyzing readiness...</span>
@@ -47,14 +47,21 @@ export default function RolloutIntelligencePanel({ rolloutId, rollout }) {
   }
 
   if (error || !intelligence) {
-    return null;
+    return (
+      <div className="bg-dark-800/60 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <span className="text-xs text-dark-300 uppercase tracking-wider">Readiness</span>
+          <span className="text-xs text-dark-500">Unavailable</span>
+        </div>
+      </div>
+    );
   }
 
   const { overallReadiness, sections } = intelligence;
   const allReady = overallReadiness.ready;
 
   return (
-    <div className="bg-dark-800/60 rounded-lg overflow-hidden">
+    <div className="bg-dark-800/60  overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}

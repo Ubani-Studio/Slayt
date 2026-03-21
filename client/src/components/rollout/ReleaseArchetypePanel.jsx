@@ -43,7 +43,7 @@ export default function ReleaseArchetypePanel() {
 
   if (loading) {
     return (
-      <div className="bg-dark-800 border border-dark-700 rounded-xl p-3">
+      <div className="bg-dark-800 border border-dark-700 p-3">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 border-2 border-dark-100 border-t-transparent rounded-full animate-spin" />
           <span className="text-dark-400 text-sm">Classifying release archetype...</span>
@@ -53,14 +53,21 @@ export default function ReleaseArchetypePanel() {
   }
 
   if (error || !data?.archetype) {
-    return null;
+    return (
+      <div className="bg-dark-800/60 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <span className="text-xs text-dark-300 uppercase tracking-wider">Release Archetype</span>
+          <span className="text-xs text-dark-500">Unavailable</span>
+        </div>
+      </div>
+    );
   }
 
   const { archetype, confidence, runnerUp, signals } = data;
   const Icon = ARCHETYPE_ICONS[data.archetypeId] || Zap;
 
   return (
-    <div className="bg-dark-800/60 rounded-lg overflow-hidden">
+    <div className="bg-dark-800/60  overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -87,7 +94,7 @@ export default function ReleaseArchetypePanel() {
           {/* Archetype Card */}
           <div className="bg-dark-800/50 rounded p-3">
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-dark-700/80 flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8  bg-dark-700/80 flex items-center justify-center flex-shrink-0">
                 <Icon className="w-4 h-4 text-dark-200" />
               </div>
               <div className="flex-1 min-w-0">

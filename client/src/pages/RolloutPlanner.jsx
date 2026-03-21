@@ -109,7 +109,7 @@ function RolloutSchedulingPanel({ rollout, onSchedule, saving }) {
   const daysUntilEnd = getDaysUntil(rollout.endDate);
 
   return (
-    <div className="bg-dark-800/60 rounded-lg overflow-hidden">
+    <div className="bg-dark-800/60  overflow-hidden">
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -573,7 +573,7 @@ function RolloutPlanner() {
     <div className="space-y-4">
       {/* Header + Toolbar */}
       <div className="flex items-center gap-3">
-        <h2 className="text-sm font-medium text-dark-300 uppercase tracking-widest">Rollout</h2>
+        <h2 className="text-lg font-sans font-medium text-dark-100 tracking-tight">Rollout</h2>
 
         {/* Dropdown Selector */}
         <div className="relative">
@@ -589,7 +589,7 @@ function RolloutPlanner() {
           </button>
 
           {dropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 w-64 bg-dark-900 border border-dark-700/50 rounded-lg shadow-2xl z-50 overflow-hidden">
+            <div className="absolute top-full left-0 mt-1 w-64 bg-dark-900 border border-dark-700/50  shadow-2xl z-50 overflow-hidden">
               {rollouts.length > 0 && (
                 <div className="max-h-60 overflow-y-auto">
                   {rollouts.map((rollout) => (
@@ -625,19 +625,19 @@ function RolloutPlanner() {
                         if (e.key === 'Enter') handleCreateRollout();
                         if (e.key === 'Escape') setIsCreating(false);
                       }}
-                      className="flex-1 px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm focus:outline-none focus:border-dark-300"
+                      className="flex-1 px-3 py-2 bg-dark-700 border border-dark-600  text-white text-sm focus:outline-none focus:border-dark-300"
                     />
                     <button
                       type="button"
                       onClick={handleCreateRollout}
-                      className="p-2 bg-dark-100 rounded-lg text-white hover:bg-white"
+                      className="p-2 bg-dark-100  text-white hover:bg-white"
                     >
                       <Check className="w-4 h-4" />
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsCreating(false)}
-                      className="p-2 bg-dark-600 rounded-lg text-dark-300 hover:bg-dark-500"
+                      className="p-2 bg-dark-600  text-dark-300 hover:bg-dark-500"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -671,7 +671,7 @@ function RolloutPlanner() {
                     if (e.key === 'Escape') setEditingName(false);
                   }}
                   autoFocus
-                  className="px-3 py-1.5 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm focus:outline-none focus:border-dark-300"
+                  className="px-3 py-1.5 bg-dark-700 border border-dark-600  text-white text-sm focus:outline-none focus:border-dark-300"
                 />
                 <button
                   type="button"
@@ -693,7 +693,7 @@ function RolloutPlanner() {
                 <button
                   type="button"
                   onClick={handleStartEditName}
-                  className="p-2 text-dark-400 hover:text-white hover:bg-dark-700 rounded-lg transition-colors"
+                  className="p-2 text-dark-400 hover:text-white hover:bg-dark-700  transition-colors"
                   title="Rename"
                 >
                   <Edit3 className="w-4 h-4" />
@@ -701,7 +701,7 @@ function RolloutPlanner() {
                 <button
                   type="button"
                   onClick={handleDeleteRollout}
-                  className="p-2 text-dark-400 hover:text-dark-200 hover:bg-dark-700 rounded-lg transition-colors"
+                  className="p-2 text-dark-400 hover:text-dark-200 hover:bg-dark-700  transition-colors"
                   title="Delete"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -737,7 +737,7 @@ function RolloutPlanner() {
         <div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {ROLLOUT_TEMPLATES.map((tpl) => (
-              <div key={tpl.id} className={`bg-dark-800/60 rounded-lg p-4 flex flex-col gap-2 hover:bg-dark-800 transition-colors border-l-2 ${
+              <div key={tpl.id} className={`bg-dark-800/60  p-4 flex flex-col gap-2 hover:bg-dark-800 transition-colors border-l-2 ${
                 tpl.tag === 'Inspired' ? 'border-l-pink-500/40' : 'border-l-dark-400/40'
               }`}>
                 <div className="flex items-center justify-between">
@@ -935,7 +935,7 @@ function RolloutSection({
 
   return (
     <div
-      className={`bg-dark-800/60 rounded-lg overflow-hidden transition-all border-l-2 border-l-accent-purple/60 ${
+      className={`bg-dark-800/60  overflow-hidden transition-all border-l-2 border-l-dark-400/60 ${
         isDragging ? 'opacity-50 ring-1 ring-dark-500' : ''
       }`}
       draggable
@@ -1011,7 +1011,7 @@ function RolloutSection({
               <Calendar className="w-4 h-4 text-white" />
             </button>
             {showDatePicker && (
-              <div className="absolute top-full right-0 mt-1 w-64 bg-dark-900 border border-dark-600 rounded-lg shadow-xl z-50 p-3">
+              <div className="absolute top-full right-0 mt-1 w-64 bg-dark-900 border border-dark-600  shadow-xl z-50 p-3">
                 <p className="text-xs text-dark-400 mb-3">Section Schedule</p>
                 <div className="space-y-3">
                   <div>
@@ -1289,7 +1289,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg bg-dark-800 border border-dark-700 rounded-xl overflow-hidden"
+        className="w-full max-w-lg bg-dark-800 border border-dark-700  overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -1317,7 +1317,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
           <button
             type="button"
             onClick={() => setSelectedPlatform(null)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+            className={`flex items-center gap-2 px-3 py-1.5  text-sm transition-colors ${
               selectedPlatform === null
                 ? 'bg-dark-100 text-dark-900'
                 : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
@@ -1330,7 +1330,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
             <button
               type="button"
               onClick={() => setSelectedPlatform('youtube')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-2 px-3 py-1.5  text-sm transition-colors ${
                 selectedPlatform === 'youtube'
                   ? 'bg-dark-100 text-dark-900'
                   : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
@@ -1344,7 +1344,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
             <button
               type="button"
               onClick={() => setSelectedPlatform('instagram')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-2 px-3 py-1.5  text-sm transition-colors ${
                 selectedPlatform === 'instagram'
                   ? 'bg-pink-500 text-white'
                   : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
@@ -1358,7 +1358,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
             <button
               type="button"
               onClick={() => setSelectedPlatform('tiktok')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-2 px-3 py-1.5  text-sm transition-colors ${
                 selectedPlatform === 'tiktok'
                   ? 'bg-cyan-500 text-white'
                   : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
@@ -1372,7 +1372,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
             <button
               type="button"
               onClick={() => setSelectedPlatform('instagram-reels')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-2 px-3 py-1.5  text-sm transition-colors ${
                 selectedPlatform === 'instagram-reels'
                   ? 'bg-purple-500 text-white'
                   : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
@@ -1386,7 +1386,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
             <button
               type="button"
               onClick={() => setSelectedPlatform('tiktok-reels')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-2 px-3 py-1.5  text-sm transition-colors ${
                 selectedPlatform === 'tiktok-reels'
                   ? 'bg-rose-500 text-white'
                   : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
@@ -1445,7 +1445,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
                   style={{ borderLeftWidth: '3px', borderLeftColor: collectionColor }}
                 >
                   <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center"
+                    className="w-10 h-10  flex items-center justify-center"
                     style={{ backgroundColor: `${platformColor}20`, color: platformColor }}
                   >
                     {getPlatformIcon(collection.platform)}
@@ -1491,14 +1491,14 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Collection name..."
                 autoFocus
-                className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm focus:outline-none focus:border-dark-300"
+                className="w-full px-3 py-2 bg-dark-700 border border-dark-600  text-white text-sm focus:outline-none focus:border-dark-300"
               />
               <input
                 type="text"
                 value={newTags}
                 onChange={(e) => setNewTags(e.target.value)}
                 placeholder="Tags (comma-separated)..."
-                className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white text-sm focus:outline-none focus:border-dark-300"
+                className="w-full px-3 py-2 bg-dark-700 border border-dark-600  text-white text-sm focus:outline-none focus:border-dark-300"
               />
               <div className="flex gap-2 justify-end">
                 <button
@@ -1511,7 +1511,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
                 <button
                   type="button"
                   onClick={handleCreate}
-                  className="px-3 py-1.5 text-sm bg-dark-100 text-dark-900 rounded-lg hover:bg-white"
+                  className="px-3 py-1.5 text-sm bg-dark-100 text-dark-900  hover:bg-white"
                 >
                   Create & Add
                 </button>
@@ -1521,7 +1521,7 @@ function CollectionPicker({ collections, selectedIds, onSelect, onClose }) {
             <button
               type="button"
               onClick={() => setIsCreating(true)}
-              className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-dark-600 rounded-lg text-dark-400 hover:border-dark-100 hover:text-white transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-dark-600  text-dark-400 hover:border-dark-100 hover:text-white transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>Create New Collection</span>
