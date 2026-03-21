@@ -12,6 +12,7 @@ const {
   lookupContentHashes,
   createClarosaSnapshot,
   getClarosaErrorMessage,
+  pushRatingToClarosa,
 } = require('../services/clarosaService');
 
 const PHONE_IMAGE_MIME_TYPES = new Set([
@@ -744,6 +745,40 @@ exports.syncClarosaInsights = async (req, res) => {
     const detail = getClarosaErrorMessage(error);
     console.error('Sync Clarosa insights error:', error);
     res.status(error.response?.status || 502).json({ error: detail });
+  }
+};
+
+// Rate content (bidirectional Clarosa sync)
+exports.rateContent = async (req, res) => {
+  try {
+    const { rating } = req.body;
+
+    if (rating !== null && (typeof rating !== 'number' || rating < 0 || rating > 5 || (rating % 0.5 !== 0))) {
+      return res.status(400).json({ error: 'Rating must be 0-5 in 0.5 increments, or null to clear' });
+    }
+
+    const content = await Content.findOne({ _id: req.params.id, userId: req.userId });
+    if (!content) {
+      return res.status(404).json({ error: 'Content not found' });
+    }
+
+    const ratingValue = rating === null ? null : rating;
+
+    await Content.updateOne(
+      { _id: content._id },
+      { $set: { 'clarosa.rating': ratingValue } },
+    );
+
+    let synced = false;
+    const clarosaConnection = resolveClarosaConnection(req.user);
+    if (clarosaConnection && content.contentHash) {
+      synced = await pushRatingToClarosa(clarosaConnection, content.contentHash, ratingValue);
+    }
+
+    res.json({ rating: ratingValue, synced });
+  } catch (error) {
+    console.error('Rate content error:', error);
+    res.status(500).json({ error: 'Failed to rate content' });
   }
 };
 

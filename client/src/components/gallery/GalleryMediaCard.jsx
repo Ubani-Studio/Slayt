@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react';
+import StarRating from './StarRating';
 
 const getDisplayTitle = (item) => item.title || item.caption || 'Untitled';
 
@@ -16,26 +17,19 @@ const getDisplayDate = (item) => {
   });
 };
 
-const getClarosaLabel = (item) => {
-  if (item.clarosa?.status !== 'matched') return null;
-  if (typeof item.clarosa.rating === 'number') {
-    return `Clarosa ${item.clarosa.rating.toFixed(1)}`;
-  }
-  return 'Clarosa Match';
-};
-
 function GalleryMediaCard({
   item,
   isSelected,
   onToggleSelect,
   onEdit,
   onDelete,
+  onRate,
   viewMode,
   readOnly,
   isYouTube,
 }) {
   const imageUrl = item.thumbnailUrl || item.mediaUrl || null;
-  const clarosaLabel = getClarosaLabel(item);
+  const rating = typeof item.clarosa?.rating === 'number' ? item.clarosa.rating : 0;
 
   if (viewMode === 'list') {
     return (
@@ -90,12 +84,15 @@ function GalleryMediaCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
-          {clarosaLabel && (
-            <span className="border border-dark-600 bg-dark-800 px-2 py-0.5 text-[11px] text-dark-300">
-              {clarosaLabel}
-            </span>
-          )}
+        <div className="flex items-center gap-3">
+          <div onClick={(e) => e.stopPropagation()}>
+            <StarRating
+              rating={rating}
+              onChange={readOnly ? undefined : (r) => onRate?.(item._id, r)}
+              size="sm"
+              readOnly={readOnly}
+            />
+          </div>
           {!readOnly && (
             <button
               onClick={(e) => {
@@ -163,11 +160,14 @@ function GalleryMediaCard({
       {/* Bottom Overlay */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2.5">
         <div className="mb-1 flex items-center justify-between gap-2">
-          {clarosaLabel && (
-            <span className="text-[10px] text-white/60">
-              {clarosaLabel}
-            </span>
-          )}
+          <div onClick={(e) => e.stopPropagation()}>
+            <StarRating
+              rating={rating}
+              onChange={readOnly ? undefined : (r) => onRate?.(item._id, r)}
+              size="sm"
+              readOnly={readOnly}
+            />
+          </div>
           <span className="text-[10px] text-white/50 ml-auto">
             {getDisplayDate(item)}
           </span>

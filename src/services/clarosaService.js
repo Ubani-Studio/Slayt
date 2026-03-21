@@ -116,6 +116,25 @@ const indexClarosaLibrary = async (connection) => {
   return data;
 };
 
+const pushRatingToClarosa = async (connection, contentHash, rating) => {
+  if (!connection || !contentHash) return false;
+
+  try {
+    await axios.put(
+      `${connection.apiBaseUrl}/ratings/sync`,
+      {
+        user_id: connection.workspaceId,
+        ratings: [{ content_hash: contentHash, rating }],
+      },
+      { timeout: 10000 },
+    );
+    return true;
+  } catch (error) {
+    console.error('Failed to push rating to Clarosa:', getClarosaErrorMessage(error));
+    return false;
+  }
+};
+
 module.exports = {
   DEFAULT_CLAROSA_BASE_URL,
   normalizeClarosaBaseUrl,
@@ -125,4 +144,5 @@ module.exports = {
   lookupContentHashes,
   lookupSingleContentHash,
   indexClarosaLibrary,
+  pushRatingToClarosa,
 };

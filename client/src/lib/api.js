@@ -535,6 +535,11 @@ export const contentApi = {
     return this.updateMediaFromBlob(id, blob, filename, options);
   },
 
+  async rate(id, rating) {
+    const { data } = await api.put(`/api/content/${id}/rate`, { rating });
+    return data;
+  },
+
   async syncClarosa() {
     const { data } = await api.post('/api/content/sync-clarosa');
     return data;

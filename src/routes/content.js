@@ -16,6 +16,7 @@ router.get('/', authenticate, contentController.getAllContent);
 router.post('/sync-clarosa', authenticate, contentController.syncClarosaInsights);
 router.get('/:id', authenticate, contentController.getContentById);
 router.put('/:id', authenticate, contentController.updateContent);
+router.put('/:id/rate', authenticate, contentController.rateContent);
 router.delete('/:id', authenticate, contentController.deleteContent);
 
 // Thumbnail update

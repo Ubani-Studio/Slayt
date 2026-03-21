@@ -15,6 +15,7 @@ import GalleryColorView from '../components/gallery/GalleryColorView';
 const MEDIA_SORT_OPTIONS = [
   { id: 'newest', label: 'Newest' },
   { id: 'oldest', label: 'Oldest' },
+  { id: 'rating', label: 'Best Rated' },
   { id: 'title', label: 'A-Z' },
   { id: 'type', label: 'Media Type' },
   { id: 'portrait', label: 'Portrait First' },
@@ -77,6 +78,12 @@ const sortMediaItems = (items, sortMode) => {
       return getItemTypeRank(a) - getItemTypeRank(b)
         || compareTitles(a, b)
         || getItemTimestamp(b) - getItemTimestamp(a);
+    }
+
+    if (sortMode === 'rating') {
+      const aRating = typeof a.clarosa?.rating === 'number' ? a.clarosa.rating : -1;
+      const bRating = typeof b.clarosa?.rating === 'number' ? b.clarosa.rating : -1;
+      return bRating - aRating || getItemTimestamp(b) - getItemTimestamp(a);
     }
 
     if (sortMode === 'portrait') {
@@ -215,6 +222,7 @@ function MediaLibrary() {
       if (searchQuery && !title.includes(searchQuery.toLowerCase())) return false;
       if (filterType === 'images' && item.mediaType === 'video') return false;
       if (filterType === 'videos' && item.mediaType !== 'video') return false;
+      if (filterType === 'rated' && !item.clarosa?.rating) return false;
       return true;
     },
     [searchQuery, filterType]
@@ -328,6 +336,24 @@ function MediaLibrary() {
     }
   };
 
+  const handleRate = useCallback(async (itemId, rating) => {
+    // Optimistic update
+    setContent((prev) =>
+      prev.map((c) =>
+        c._id === itemId
+          ? { ...c, clarosa: { ...c.clarosa, rating } }
+          : c
+      )
+    );
+
+    try {
+      await contentApi.rate(itemId, rating);
+    } catch (err) {
+      console.error('Rating failed:', err);
+      await fetchAll();
+    }
+  }, [fetchAll]);
+
   const handleEdit = (item) => {
     selectPost(item._id);
     navigate('/grid');
@@ -423,6 +449,7 @@ function MediaLibrary() {
           onToggleSelect={toggleSelection}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onRate={handleRate}
           viewMode={viewMode}
           readOnly={readOnly}
           isYouTube={isYouTube}
@@ -473,7 +500,7 @@ function MediaLibrary() {
           />
 
           {/* Filter */}
-          {['all', 'images', 'videos'].map((f) => (
+          {['all', 'images', 'videos', 'rated'].map((f) => (
             <button
               key={f}
               onClick={() => setFilterType(f)}
