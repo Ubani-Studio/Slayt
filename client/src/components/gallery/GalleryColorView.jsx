@@ -42,8 +42,7 @@ function GalleryColorView({
     }
   };
 
-  // Group items by color bucket — primary color determines placement,
-  // items only appear once (in their dominant chromatic bucket)
+  // Group items by color bucket
   const groupedItems = useMemo(() => {
     const groups = {};
     HUE_BUCKETS.forEach((bucket) => {
@@ -51,21 +50,10 @@ function GalleryColorView({
     });
 
     allItems.forEach((item) => {
-      const colors = item.metadata?.dominantColors || [];
-      // Use first chromatic color, fall back to first color, fall back to null
-      let bestBucket = 'Neutrals';
-      for (const hex of colors) {
-        const bucket = classifyColor(hex);
-        if (bucket !== 'Neutrals') {
-          bestBucket = bucket;
-          break;
-        }
-      }
-      if (bestBucket === 'Neutrals' && colors[0]) {
-        bestBucket = classifyColor(colors[0]);
-      }
-      if (groups[bestBucket]) {
-        groups[bestBucket].push(item);
+      const hex = item.metadata?.dominantColors?.[0] || null;
+      const bucket = classifyColor(hex);
+      if (groups[bucket]) {
+        groups[bucket].push(item);
       } else {
         groups['Neutrals'].push(item);
       }

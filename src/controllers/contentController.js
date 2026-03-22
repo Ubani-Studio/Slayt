@@ -6,7 +6,7 @@ const cloudinaryService = require('../services/cloudinaryService');
 const { useCloudStorage, uploadDir, thumbnailDir } = require('../middleware/upload');
 const approvalGateService = require('../services/approvalGateService');
 const { computeContentHashFromUpload } = require('../utils/contentHash');
-const { extractDominantColors } = require('../utils/colorExtract');
+const { extractDominantColor } = require('../utils/colorExtract');
 const {
   resolveClarosaConnection,
   lookupSingleContentHash,
@@ -164,7 +164,7 @@ exports.createContent = async (req, res) => {
           crop: 'fill',
         });
 
-        const dominantColors = await extractDominantColors(uploadBuffer);
+        const dominantColor = await extractDominantColor(uploadBuffer);
         metadata = {
           width: uploadResult.width,
           height: uploadResult.height,
@@ -172,7 +172,7 @@ exports.createContent = async (req, res) => {
           fileSize: uploadResult.bytes,
           format: normalizedImageFormat || uploadResult.format,
           cloudinaryPublicId: uploadResult.public_id,
-          dominantColors: dominantColors.filter(Boolean),
+          dominantColors: dominantColor ? [dominantColor] : [],
         };
       } else if (isVideo) {
         // For videos, Cloudinary can auto-generate thumbnail
@@ -209,14 +209,14 @@ exports.createContent = async (req, res) => {
       // Get image metadata
       if (isImage) {
         const imageMetadata = await sharp(req.file.path).metadata();
-        const dominantColors = await extractDominantColors(req.file.path);
+        const dominantColor = await extractDominantColor(req.file.path);
         metadata = {
           width: imageMetadata.width,
           height: imageMetadata.height,
           aspectRatio: `${imageMetadata.width}:${imageMetadata.height}`,
           fileSize: req.file.size,
           format: imageMetadata.format,
-          dominantColors: dominantColors.filter(Boolean),
+          dominantColors: dominantColor ? [dominantColor] : [],
         };
       }
     }
@@ -827,12 +827,11 @@ exports.backfillColors = async (req, res) => {
             return;
           }
 
-          const colors = await extractDominantColors(input);
-          const valid = colors.filter(Boolean);
-          if (valid.length > 0) {
+          const color = await extractDominantColor(input);
+          if (color) {
             await Content.updateOne(
               { _id: item._id },
-              { $set: { 'metadata.dominantColors': valid } },
+              { $set: { 'metadata.dominantColors': [color] } },
             );
             processed++;
           } else {
