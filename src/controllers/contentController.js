@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const cloudinaryService = require('../services/cloudinaryService');
 const { useCloudStorage, uploadDir, thumbnailDir } = require('../middleware/upload');
+const projectRoot = path.join(__dirname, '../..');
 const approvalGateService = require('../services/approvalGateService');
 const { computeContentHashFromUpload } = require('../utils/contentHash');
 const { extractDominantColor } = require('../utils/colorExtract');
@@ -787,17 +788,16 @@ exports.rateContent = async (req, res) => {
   }
 };
 
-// Backfill dominant colors for existing images
+// Backfill dominant colors for existing content
 exports.backfillColors = async (req, res) => {
   try {
     const items = await Content.find({
       userId: req.userId,
-      mediaType: 'image',
       $or: [
         { 'metadata.dominantColors': { $exists: false } },
         { 'metadata.dominantColors': { $size: 0 } },
       ],
-    }).select('_id mediaUrl metadata');
+    }).select('_id mediaUrl thumbnailUrl mediaType metadata');
 
     if (items.length === 0) {
       return res.json({ processed: 0, skipped: 0, failed: 0 });
@@ -805,25 +805,41 @@ exports.backfillColors = async (req, res) => {
 
     let processed = 0;
     let failed = 0;
+    let skipped = 0;
     const BATCH = 10;
+
+    const resolveInput = async (url) => {
+      if (!url) return null;
+      if (url.startsWith('/uploads/')) {
+        // Local file — resolve relative to project root
+        const filePath = path.join(projectRoot, url);
+        if (require('fs').existsSync(filePath)) return filePath;
+        return null;
+      }
+      if (url.startsWith('http')) {
+        const axios = require('axios');
+        const response = await axios.get(url, {
+          responseType: 'arraybuffer',
+          timeout: 15000,
+        });
+        return Buffer.from(response.data);
+      }
+      return null;
+    };
 
     for (let i = 0; i < items.length; i += BATCH) {
       const batch = items.slice(i, i + BATCH);
 
       await Promise.all(batch.map(async (item) => {
         try {
-          let input;
-          if (item.mediaUrl?.startsWith('/uploads/')) {
-            input = path.join(__dirname, '../../public', item.mediaUrl);
-          } else if (item.mediaUrl?.startsWith('http')) {
-            const axios = require('axios');
-            const response = await axios.get(item.mediaUrl, {
-              responseType: 'arraybuffer',
-              timeout: 15000,
-            });
-            input = Buffer.from(response.data);
-          } else {
-            failed++;
+          // For videos, use thumbnail. For images, use media URL.
+          const url = item.mediaType === 'video'
+            ? (item.thumbnailUrl || item.mediaUrl)
+            : (item.mediaUrl || item.thumbnailUrl);
+
+          const input = await resolveInput(url);
+          if (!input) {
+            skipped++;
             return;
           }
 
@@ -845,7 +861,7 @@ exports.backfillColors = async (req, res) => {
 
     res.json({
       processed,
-      skipped: 0,
+      skipped,
       failed,
       total: items.length,
     });
