@@ -45,6 +45,7 @@
     "mongoose": "^8.0.3",
     "multer": "^1.4.5-lts.1",
     "multer-storage-cloudinary": "^4.0.0",
+    "node-vibrant": "^4.0.4",
     "openai": "^4.20.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",

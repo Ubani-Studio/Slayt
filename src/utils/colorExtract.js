@@ -1,32 +1,36 @@
-const sharp = require('sharp');
+let Vibrant;
+
+async function loadVibrant() {
+  if (!Vibrant) {
+    const mod = await import('node-vibrant/node');
+    Vibrant = mod.default || mod.Vibrant || mod;
+  }
+  return Vibrant;
+}
 
 /**
- * Extract dominant color by averaging all pixels at 50x50.
- * Returns hex string like '#a1522f'.
+ * Extract dominant color using node-vibrant (MMCQ color quantization).
+ * Returns the most visually prominent hex color string.
  */
 async function extractDominantColor(input) {
   try {
-    const { data, info } = await sharp(input)
-      .resize(50, 50, { fit: 'cover' })
-      .removeAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+    const V = await loadVibrant();
+    const palette = await V.from(input).quality(3).getPalette();
 
-    const pixelCount = info.width * info.height;
-    let r = 0, g = 0, b = 0;
+    // Priority: Vibrant > DarkVibrant > LightVibrant > Muted > DarkMuted > LightMuted
+    const swatch =
+      palette.Vibrant ||
+      palette.DarkVibrant ||
+      palette.LightVibrant ||
+      palette.Muted ||
+      palette.DarkMuted ||
+      palette.LightMuted;
 
-    for (let i = 0; i < data.length; i += 3) {
-      r += data[i];
-      g += data[i + 1];
-      b += data[i + 2];
-    }
+    if (!swatch) return null;
 
-    r = Math.round(r / pixelCount);
-    g = Math.round(g / pixelCount);
-    b = Math.round(b / pixelCount);
-
-    return '#' + [r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('');
-  } catch {
+    return swatch.hex;
+  } catch (err) {
+    console.error('Color extraction failed:', err.message);
     return null;
   }
 }
